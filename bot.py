@@ -20,9 +20,14 @@ from database import (
     get_user_info,
     get_shombool,
     add_shombool,
-    get_last_claim,
-    set_last_claim,
+    get_chochol,
+    add_chochol,
+    get_last_shombool_claim,
+    set_last_shombool_claim,
+    get_last_chochol_claim,
+    set_last_chochol_claim,
     get_top_shombool,
+    get_top_chochol,
 )
 
 # ---------- لاگ ----------
@@ -30,7 +35,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
-# خاموش کردن لاگ‌های httpx (توکن لو نره)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.getLogger("telegram.ext").setLevel(logging.WARNING)
@@ -39,7 +43,8 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("BOT_TOKEN")
 
 SHOMBOOL_AMOUNT = 5
-SHOMBOOL_COOLDOWN = 60
+CHOCHOL_AMOUNT = 5
+COOLDOWN = 60
 
 # 🎉 متن خوش‌آمد گروه
 WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
@@ -48,12 +53,12 @@ WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
 ━━━━━━━━━━━━━━━
 🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>"""
 
-# 📝 سوال جنسیت (فقط همین، بدون توضیح اضافه)
+# 📝 سوال جنسیت (فقط همین)
 GENDER_QUESTION = "🎭 <b>جنسیتت چیه؟</b>"
 
 # ---------- ۴ متن خوش‌آمد ----------
 
-# 👧 دختر با جنبه → «سلام خانوم محترم»
+# 👧 دختر با جنبه
 WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 خوش اومدی به ربات ما 💖
 امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
@@ -62,7 +67,7 @@ WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
 مخصوصاً اونایی که استارت کردن رباتو 🚀"""
 
-# 👧 دختر بی‌جنبه → «سلام شنیدم که می‌خوای کصخل باشی»
+# 👧 دختر بی‌جنبه
 WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
 
 تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
@@ -70,7 +75,7 @@ WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل �
 
 🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی"""
 
-# 👦 پسر با جنبه → «سلام آقای خوشتیپ»
+# 👦 پسر با جنبه
 WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 خوش اومدی به ربات ما 🎉
 امیدوارم که اینجا بهت خوش بگذره 🥳
@@ -82,7 +87,7 @@ WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 همین دیگه، مونده <b>گار باشی</b> 💪
 فعلاً 👋"""
 
-# 👦 پسر بی‌جنبه → «شنیدم دلت شومبول می‌خواد»
+# 👦 پسر بی‌جنبه
 WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
 تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
@@ -111,6 +116,13 @@ def _format_remaining(seconds: int) -> str:
 
 
 def _gender_keyboard():
+    """
+    اسم دکمه‌ها عوض شده ولی callback‌ها همون قبلیه:
+    - «دخترم، جنبه دارم»  → g_girl_yes → یعنی دختر بی‌جنبه
+    - «دخترم، جنبه ندارم» → g_girl_no  → یعنی دختر با جنبه
+    - «پسرم، جنبه دارم»   → g_boy_yes  → یعنی پسر بی‌جنبه
+    - «پسرم، جنبه ندارم»  → g_boy_no   → یعنی پسر با جنبه
+    """
     keyboard = [
         [
             InlineKeyboardButton("👧 دخترم، جنبه دارم", callback_data="g_girl_yes"),
@@ -127,15 +139,12 @@ def _gender_keyboard():
 # ---------- هندلر استارت ----------
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-
     save_user(
         user_id=user.id,
         first_name=user.first_name or "",
         last_name=user.last_name or "",
         username=user.username or "",
     )
-
-    # فقط سوال جنسیت + دکمه‌ها
     await update.message.reply_text(
         GENDER_QUESTION,
         parse_mode="HTML",
@@ -151,35 +160,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # 👧 دختر با جنبه → «سلام خانوم محترم»
+    # «دخترم، جنبه دارم» → دختر بی‌جنبه
     if data == "g_girl_yes":
-        ok = save_gender_info(user_id, "دختر", "دارم")
-        if ok:
-            await query.edit_message_text(WELCOME_GIRL_YES, parse_mode="HTML")
-        else:
-            await query.edit_message_text("❌ اول /start بزن.")
-
-    # 👧 دختر بی‌جنبه → «سلام شنیدم که می‌خوای کصخل باشی»
-    elif data == "g_girl_no":
         ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
             await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
-    # 👦 پسر با جنبه → «سلام آقای خوشتیپ»
-    elif data == "g_boy_yes":
-        ok = save_gender_info(user_id, "پسر", "دارم")
+    # «دخترم، جنبه ندارم» → دختر با جنبه
+    elif data == "g_girl_no":
+        ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
-            await query.edit_message_text(WELCOME_BOY_YES, parse_mode="HTML")
+            await query.edit_message_text(WELCOME_GIRL_YES, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
-    # 👦 پسر بی‌جنبه → «شنیدم دلت شومبول می‌خواد»
-    elif data == "g_boy_no":
+    # «پسرم، جنبه دارم» → پسر بی‌جنبه
+    elif data == "g_boy_yes":
         ok = save_gender_info(user_id, "پسر", "ندارم")
         if ok:
             await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
+        else:
+            await query.edit_message_text("❌ اول /start بزن.")
+
+    # «پسرم، جنبه ندارم» → پسر با جنبه
+    elif data == "g_boy_no":
+        ok = save_gender_info(user_id, "پسر", "دارم")
+        if ok:
+            await query.edit_message_text(WELCOME_BOY_YES, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
@@ -208,7 +217,7 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطا در ارسال پیام خوش‌آمد: {e}")
 
 
-# ---------- ✅ هندلر شومبول ----------
+# ---------- ✅ هندلر شومبول (فقط پسر با جنبه) ----------
 async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -222,6 +231,29 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cleaned != "شومبول":
         return
 
+    info = get_user_info(user_id)
+    if not info:
+        return
+
+    gender = info.get("gender")
+    jense = info.get("jense")
+
+    # فقط پسر با جنبه
+    if not (gender == "پسر" and jense == "دارم"):
+        if gender == "دختر":
+            await update.message.reply_text(
+                "❌ <b>دخترا نمی‌تونن شومبول بزنن!</b>\n"
+                "🍆 برو <b>چوچول</b> بزن 😏",
+                parse_mode="HTML",
+            )
+        else:
+            await update.message.reply_text(
+                "❌ <b>تو نمی‌تونی شومبول بزنی!</b>\n"
+                "فقط <b>پسرای با جنبه</b> می‌تونن 😎",
+                parse_mode="HTML",
+            )
+        return
+
     save_user(
         user_id=user.id,
         first_name=user.first_name or "",
@@ -229,39 +261,111 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username or "",
     )
 
-    last_claim = get_last_claim(user_id)
+    last_claim = get_last_shombool_claim(user_id)
     now = datetime.now()
 
     if last_claim:
         elapsed = (now - last_claim).total_seconds()
-        remaining = SHOMBOOL_COOLDOWN - elapsed
-
+        remaining = COOLDOWN - elapsed
         if remaining > 0:
             remaining_int = int(remaining) + 1
-            text = (
+            await update.message.reply_text(
                 f"⏳ <b>صبر کن کونده خان!</b> 😤\n"
                 f"بعد از <b>{_format_remaining(remaining_int)}</b> "
-                f"دیگه می‌تونی شومبول درخواست کنی 🍌"
+                f"دیگه می‌تونی شومبول درخواست کنی 🍌",
+                parse_mode="HTML",
             )
-            await update.message.reply_text(text, parse_mode="HTML")
             return
 
     add_shombool(user_id, SHOMBOOL_AMOUNT)
-    set_last_claim(user_id, now)
+    set_last_shombool_claim(user_id, now)
 
     total = get_shombool(user_id)
     safe_name = html.escape(user.first_name or "دوست")
     mention = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
 
-    text = (
+    await update.message.reply_text(
         f"🍌 {mention} عزیز!\n"
         f"<b>{SHOMBOOL_AMOUNT} شومبول متوسط</b> دریافت کردی ✅\n"
         f"📦 شومبول‌های موجود در انبار: <b>{total}</b>\n\n"
-        f"⏳ بعد از <b>۱ دقیقه</b> می‌تونی دوباره شومبول درخواست کنی 😉"
+        f"⏳ بعد از <b>۱ دقیقه</b> می‌تونی دوباره شومبول درخواست کنی 😉",
+        parse_mode="HTML",
+        disable_web_page_preview=True,
     )
 
+
+# ---------- ✅ هندلر چوچول (فقط دختر با جنبه) ----------
+async def chochol_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.effective_user:
+        return
+
+    user = update.effective_user
+    user_id = user.id
+
+    message_text = (update.message.text or "").strip()
+    cleaned = message_text.replace("🍆", "").strip()
+
+    if cleaned != "چوچول":
+        return
+
+    info = get_user_info(user_id)
+    if not info:
+        return
+
+    gender = info.get("gender")
+    jense = info.get("jense")
+
+    # فقط دختر با جنبه
+    if not (gender == "دختر" and jense == "دارم"):
+        if gender == "پسر":
+            await update.message.reply_text(
+                "❌ <b>پسرا نمی‌تونن چوچول بزنن!</b>\n"
+                "🍌 برو <b>شومبول</b> بزن 😏",
+                parse_mode="HTML",
+            )
+        else:
+            await update.message.reply_text(
+                "❌ <b>تو نمی‌تونی چوچول بزنی!</b>\n"
+                "فقط <b>دخترای با جنبه</b> می‌تونن 😎",
+                parse_mode="HTML",
+            )
+        return
+
+    save_user(
+        user_id=user.id,
+        first_name=user.first_name or "",
+        last_name=user.last_name or "",
+        username=user.username or "",
+    )
+
+    last_claim = get_last_chochol_claim(user_id)
+    now = datetime.now()
+
+    if last_claim:
+        elapsed = (now - last_claim).total_seconds()
+        remaining = COOLDOWN - elapsed
+        if remaining > 0:
+            remaining_int = int(remaining) + 1
+            await update.message.reply_text(
+                f"⏳ <b>صبر کن کونده خان!</b> 😤\n"
+                f"بعد از <b>{_format_remaining(remaining_int)}</b> "
+                f"دیگه می‌تونی چوچول درخواست کنی 🍆",
+                parse_mode="HTML",
+            )
+            return
+
+    add_chochol(user_id, CHOCHOL_AMOUNT)
+    set_last_chochol_claim(user_id, now)
+
+    total = get_chochol(user_id)
+    safe_name = html.escape(user.first_name or "دوست")
+    mention = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
     await update.message.reply_text(
-        text,
+        f"🍆 {mention} عزیز!\n"
+        f"<b>{CHOCHOL_AMOUNT} چوچول متوسط</b> دریافت کردی ✅\n"
+        f"📦 چوچول‌های موجود در انبار: <b>{total}</b>\n\n"
+        f"⏳ بعد از <b>۱ دقیقه</b> می‌تونی دوباره چوچول درخواست کنی 😉",
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
@@ -303,6 +407,13 @@ def main():
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             shombool_handler,
+        )
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            chochol_handler,
         )
     )
 
