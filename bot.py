@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("BOT_TOKEN")
 
 # ⚙️ تنظیمات شومبول
-SHOMBOOL_AMOUNT = 20          # مقدار هر دریافت
+SHOMBOOL_AMOUNT = 5           # مقدار هر دریافت
 SHOMBOOL_COOLDOWN = 60        # ثانیه
 
 START_TEXT = os.getenv(
@@ -139,9 +139,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- 🎉 خوش‌آمد گروه ----------
 async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    وقتی ربات به گروه اضافه می‌شه، پیام خوش‌آمد می‌فرسته.
-    """
+    """وقتی ربات به گروه اضافه می‌شه، پیام خوش‌آمد می‌فرسته."""
     if not update.message or not update.message.new_chat_members:
         return
 
@@ -151,7 +149,6 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not added_bot:
         return
 
-    # اطمینان از اینکه ربات توی گروه بمونه (اگه محدودیت داره)
     chat = update.effective_chat
     logger.info(f"✅ ربات به گروه اضافه شد: {chat.title} ({chat.id})")
 
@@ -190,7 +187,7 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remaining > 0:
             remaining_int = int(remaining) + 1
             text = (
-                f"⏳ <b>صبر کن بابا!</b> 😤\n"
+                f"⏳ <b>صبر کن کونده خان!</b> 😤\n"
                 f"بعد از <b>{_format_remaining(remaining_int)}</b> "
                 f"دیگه می‌تونی شومبول درخواست کنی 🍌"
             )
