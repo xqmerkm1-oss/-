@@ -17,7 +17,6 @@ from database import (
     init_db,
     save_user,
     save_gender_info,
-    get_user_count,
     get_user_info,
     get_shombool,
     add_shombool,
@@ -36,26 +35,23 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("BOT_TOKEN")
 
 # ⚙️ تنظیمات شومبول
-SHOMBOOL_AMOUNT = 5           # مقدار هر دریافت
-SHOMBOOL_COOLDOWN = 60        # ثانیه
+SHOMBOOL_AMOUNT = 5
+SHOMBOOL_COOLDOWN = 60
 
-# 📝 متن استارت
-START_TEXT = os.getenv(
-    "START_TEXT",
-    """سلام {mention} 👋
-شنیدم دلت شومبول می‌خواد 🍌
-تو می‌تونی یه کصخل بامزه باشی برای به‌گایی‌هات برای ایران 🤡
+# 📝 متن استارت اولیه (قبل از انتخاب جنسیت)
+START_TEXT = """سلام {mention} 👋
+شنیدم دلت <b>شومبول</b> می‌خواد 🍌
+تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
-🎯 شومبول و نازسرین جمع کن تا بتونی کصخل بهتری باشی
+🎯 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
 
 ━━━━━━━━━━━━━━━
 😎 شمارو بعضی وقتا به تخممون می‌گیریم
-📈 عملکرد خوب که نه، ولی تو می‌تونی کصخل نیو داشته باشی
-🔄 آپدیت‌های سالیانه میدیم بیرون
+📈 عملکرد خوب که نه، ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی
+🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
 🤝 مثل شما می‌تونیم یه کصخل باشیم
-🕐 پشتیبانی ۲۶ ساعته
-💰 کاملاً رایگان — بعضی وقتا پولی 😏"""
-)
+🕐 پشتیبانی <b>۲۶ ساعته</b>
+💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
 
 # 🎉 متن خوش‌آمد گروه
 WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
@@ -63,30 +59,28 @@ WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
 
 ━━━━━━━━━━━━━━━
 🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>
-🏆 برترین‌ها رو از دکمه‌ها ببینید 👇
-"""
+🏆 برترین‌ها رو از دکمه‌ها ببینید 👇"""
 
 # 📖 متن توضیحات کوتاه
 INFO_TEXT = """📖 <b>توضیحات کوتاه</b>
 
 🍌 <b>شومبول چیه؟</b>
-یه واحد پول خنده‌دار که با نوشتن کلمه‌ی «شومبول» توی گروه به دست میاد!
+یه واحد پول خنده‌دار که با نوشتن کلمه‌ی «<b>شومبول</b>» توی گروه به دست میاد!
 
 ⚙️ <b>چطور کار می‌کنه؟</b>
-• توی گروه بنویس: <b>شومبول</b>
+• توی گروه <b>تنها</b> بنویس: <b>شومبول</b>
 • هر بار <b>۵ شومبول متوسط</b> می‌گیری
 • هر <b>۱ دقیقه</b> یه بار می‌تونی درخواست کنی
 
 🎯 <b>جنبه چیه؟</b>
-• <b>با جنبه‌ها</b> می‌تونن از <b>۱۰۰٪</b> ربات استفاده کنن
-• <b>بی‌جنبه‌ها</b> فقط از یه چیزای کمش 😏
+• <b>با جنبه‌ها</b> → از <b>۱۰۰٪</b> ربات استفاده می‌کنن ✅
+• <b>بی‌جنبه‌ها</b> → فقط از یه چیزای کمش 😏
 
 🏆 <b>برترین‌ها</b>
 با جمع کردن شومبول، اسمت میره توی لیست برترین‌ها!
 
 ━━━━━━━━━━━━━━━
-💡 برای شروع، جنسیتت رو انتخاب کن 👇
-"""
+💡 برای شروع، جنسیتت رو انتخاب کن 👇"""
 
 # 📝 متن سوال جنسیت
 GENDER_QUESTION = """🎭 <b>جنسیتت چیه؟</b>
@@ -103,6 +97,77 @@ GENDER_QUESTION = """🎭 <b>جنسیتت چیه؟</b>
 
 الان انتخاب کن 👇"""
 
+# 👧 متن خوش‌آمد: دختر با جنبه
+WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
+خوش اومدی به ربات ما 💖
+امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
+
+✨ <b>خوبی این ربات اینکه</b> می‌تونی وجود خودتو به بقیه اثبات کنی 💫
+کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
+مخصوصاً اونایی که استارت کردن رباتو 🚀
+
+━━━━━━━━━━━━━━━
+👑 تو یه <b>دختر با جنبه</b> هستی
+می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 🎉
+
+🍌 برای شروع بنویس: <b>شومبول</b>
+"""
+
+# 👧 متن خوش‌آمد: دختر بی‌جنبه
+WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
+
+تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
+مخصوصاً اگه <b>ایرانی</b> باشن 🇮🇷
+
+🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
+
+━━━━━━━━━━━━━━━
+👧 تو یه <b>دختر بی‌جنبه</b> هستی
+فقط از یه چیزای کمش می‌تونی استفاده کنی 😏
+
+🍌 برای شروع بنویس: <b>شومبول</b>
+"""
+
+# 👦 متن خوش‌آمد: پسر با جنبه
+WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
+خوش اومدی به ربات ما 🎉
+امیدوارم که اینجا بهت خوش بگذره 🥳
+
+✨ <b>خوبی ربات ما اینکه</b> می‌تونی ربات خودتو بنا به خواسته‌هات شخصی‌سازی کنی 🎨
+(به صورت محدود 😅)
+و جملات خوبی می‌تونی برای <b>افزایش اعتبار</b> استفاده کنی 📈
+
+همین دیگه، مونده <b>گار باشی</b> 💪
+فعلاً 👋
+
+━━━━━━━━━━━━━━━
+👑 تو یه <b>پسر با جنبه</b> هستی
+می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 🎉
+
+🍌 برای شروع بنویس: <b>شومبول</b>
+"""
+
+# 👦 متن خوش‌آمد: پسر بی‌جنبه
+WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
+تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
+
+🎯 <b>شوبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
+
+━━━━━━━━━━━━━━━
+😎 شمارو بعضی وقتا به تخممون می‌گیریم
+📈 عملکرد خوب که نه، ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی
+🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
+🤝 مثل شما می‌تونیم یه کصخل باشیم
+🕐 پشتیبانی <b>۲۶ ساعته</b>
+💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏
+
+━━━━━━━━━━━━━━━
+👦 تو یه <b>پسر بی‌جنبه</b> هستی
+فقط از یه چیزای کمش می‌تونی استفاده کنی 😏
+
+🍌 برای شروع بنویس: <b>شومبول</b>
+"""
+
 
 # ---------- کمکی ----------
 def _format_remaining(seconds: int) -> str:
@@ -118,7 +183,6 @@ def _format_remaining(seconds: int) -> str:
 
 
 def _gender_keyboard():
-    """کیبورد ۴ دکمه‌ای جنسیت."""
     keyboard = [
         [
             InlineKeyboardButton("👧 دخترم، جنبه دارم", callback_data="g_girl_yes"),
@@ -136,7 +200,6 @@ def _gender_keyboard():
 
 
 def _main_keyboard():
-    """کیبورد اصلی برای کاربر ثبت‌شده."""
     keyboard = [
         [InlineKeyboardButton("📖 توضیحات کوتاه", callback_data="info")],
         [InlineKeyboardButton("🍌 موجودی من", callback_data="my_balance")],
@@ -146,12 +209,8 @@ def _main_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-# ---------- هندلر استارت (خودکار) ----------
+# ---------- هندلر استارت ----------
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    وقتی کاربر ربات رو استارت می‌کنه (چه با /start چه با لینک)،
-    مستقیم پیام خوش‌آمد + سوال جنسیت میاد.
-    """
     user = update.effective_user
 
     save_user(
@@ -164,14 +223,12 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     safe_name = html.escape(user.first_name or "دوست")
     mention = f'<a href="tg://user?id={user.id}">{safe_name}</a>'
 
-    # پیام اول: متن استارت
     await update.message.reply_text(
         START_TEXT.format(mention=mention),
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
 
-    # پیام دوم: سوال جنسیت با ۴ دکمه + توضیحات
     await update.message.reply_text(
         GENDER_QUESTION,
         parse_mode="HTML",
@@ -187,82 +244,79 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # ---------- جنسیت: دختر با جنبه ----------
+    # 👧 دختر با جنبه
     if data == "g_girl_yes":
         ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
             await query.edit_message_text(
-                "✅ ثبت شد!\n\n"
-                "👧 <b>دختر با جنبه</b> — خوش اومدی 🎉\n"
-                "می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 😎",
+                WELCOME_GIRL_YES,
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
+                disable_web_page_preview=True,
             )
         else:
             await query.edit_message_text("❌ اول ربات رو استارت کن.")
 
-    # ---------- جنسیت: دختر بی‌جنبه ----------
+    # 👧 دختر بی‌جنبه
     elif data == "g_girl_no":
         ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
             await query.edit_message_text(
-                "✅ ثبت شد!\n\n"
-                "👧 <b>دختر بی‌جنبه</b> — خوش اومدی 🎉\n"
-                "فقط از یه چیزای کمش می‌تونی استفاده کنی 😏",
+                WELCOME_GIRL_NO,
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
+                disable_web_page_preview=True,
             )
         else:
             await query.edit_message_text("❌ اول ربات رو استارت کن.")
 
-    # ---------- جنسیت: پسر با جنبه ----------
+    # 👦 پسر با جنبه
     elif data == "g_boy_yes":
         ok = save_gender_info(user_id, "پسر", "دارم")
         if ok:
             await query.edit_message_text(
-                "✅ ثبت شد!\n\n"
-                "👦 <b>پسر با جنبه</b> — خوش اومدی 🎉\n"
-                "می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 😎",
+                WELCOME_BOY_YES,
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
+                disable_web_page_preview=True,
             )
         else:
             await query.edit_message_text("❌ اول ربات رو استارت کن.")
 
-    # ---------- جنسیت: پسر بی‌جنبه ----------
+    # 👦 پسر بی‌جنبه
     elif data == "g_boy_no":
         ok = save_gender_info(user_id, "پسر", "ندارم")
         if ok:
             await query.edit_message_text(
-                "✅ ثبت شد!\n\n"
-                "👦 <b>پسر بی‌جنبه</b> — خوش اومدی 🎉\n"
-                "فقط از یه چیزای کمش می‌تونی استفاده کنی 😏",
+                WELCOME_BOY_NO,
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
+                disable_web_page_preview=True,
             )
         else:
             await query.edit_message_text("❌ اول ربات رو استارت کن.")
 
-    # ---------- توضیحات کوتاه ----------
+    # 📖 توضیحات
     elif data == "info":
         await query.edit_message_text(
             INFO_TEXT,
             parse_mode="HTML",
             reply_markup=_main_keyboard(),
+            disable_web_page_preview=True,
         )
 
-    # ---------- موجودی من ----------
+    # 🍌 موجودی
     elif data == "my_balance":
         amount = get_shombool(user_id)
         await query.edit_message_text(
-            f"🍌 <b>موجودی شومبول تو:</b>\n\n"
+            f"🍌 <b>موجودی شومبول تو</b>\n\n"
             f"📦 انبار: <b>{amount}</b> شومبول\n\n"
-            f"💡 برای دریافت، توی گروه بنویس: <b>شومبول</b>",
+            f"💡 برای دریافت، توی گروه <b>تنها</b> بنویس: <b>شومبول</b>",
             parse_mode="HTML",
             reply_markup=_main_keyboard(),
         )
 
-    # ---------- برترین‌ها ----------
+    # 🏆 برترین‌ها
     elif data == "top":
         rows = get_top_shombool(10)
         if not rows:
@@ -288,7 +342,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_web_page_preview=True,
         )
 
-    # ---------- پروفایل من ----------
+    # 👤 پروفایل
     elif data == "my_profile":
         info = get_user_info(user_id)
         if not info:
@@ -319,7 +373,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- 🎉 خوش‌آمد گروه ----------
 async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی ربات به گروه اضافه می‌شه، پیام خوش‌آمد می‌فرسته."""
     if not update.message or not update.message.new_chat_members:
         return
 
@@ -342,13 +395,26 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطا در ارسال پیام خوش‌آمد: {e}")
 
 
-# ---------- هندلر شومبول ----------
+# ---------- ✅ هندلر شومبول (فقط کلمه‌ی تنها) ----------
 async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    فقط وقتی کاربر «تنهایی» کلمه‌ی شومبول رو می‌نویسه، شومبول می‌گیره.
+    (نه توی جمله)
+    """
     if not update.message or not update.effective_user:
         return
 
     user = update.effective_user
     user_id = user.id
+
+    # چک: فقط کلمه‌ی «شومبول» (با فاصله/ایموجی/کاراکتر اضافه)
+    message_text = (update.message.text or "").strip()
+    # حذف ایموجی و کاراکترهای اضافی از دو طرف
+    cleaned = message_text.replace("🍌", "").strip()
+
+    # فقط اگه دقیقاً «شومبول» باشه (حساس به فاصله)
+    if cleaned != "شومبول":
+        return
 
     save_user(
         user_id=user.id,
@@ -374,6 +440,7 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text, parse_mode="HTML")
             return
 
+    # ✅ اضافه کردن شومبول (هر بار +۵)
     add_shombool(user_id, SHOMBOOL_AMOUNT)
     set_last_claim(user_id, now)
 
@@ -422,7 +489,7 @@ def main():
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler)
     )
 
-    # 🚀 استارت (خودکار — هر پیامی که /start باشه یا اولین پیام کاربر)
+    # 🚀 استارت
     app.add_handler(
         MessageHandler(filters.Regex(r"^/start"), start_handler)
     )
@@ -430,10 +497,10 @@ def main():
     # دکمه‌های شیشه‌ای
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # هندلر «شومبول»
+    # ✅ هندلر شومبول — فقط پیام‌های متنی غیردستوری
     app.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.Regex(r"شومبول"),
+            filters.TEXT & ~filters.COMMAND,
             shombool_handler,
         )
     )
