@@ -57,8 +57,18 @@ START_TEXT = os.getenv(
 💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
 )
 
+# 🎉 متن خوش‌آمد وقتی ربات به گروه اضافه می‌شه
+WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
+پاشید <b>جق بزنید</b> 💦✊
 
-# ---------- کمکی: نمایش ثانیه به فرمت خوانا ----------
+━━━━━━━━━━━━━━━
+🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>
+🏆 برترین‌ها: /top
+📦 موجودی: /shombool
+"""
+
+
+# ---------- کمکی ----------
 def _format_remaining(seconds: int) -> str:
     if seconds <= 0:
         return "الان"
@@ -127,19 +137,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ اول /start بزن.")
 
 
-# ---------- هندلر اصلی: شنیدن «شومبول» ----------
+# ---------- 🎉 خوش‌آمد گروه ----------
+async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    وقتی ربات به گروه اضافه می‌شه، پیام خوش‌آمد می‌فرسته.
+    """
+    if not update.message or not update.message.new_chat_members:
+        return
+
+    bot_id = context.bot.id
+    added_bot = any(member.id == bot_id for member in update.message.new_chat_members)
+
+    if not added_bot:
+        return
+
+    # اطمینان از اینکه ربات توی گروه بمونه (اگه محدودیت داره)
+    chat = update.effective_chat
+    logger.info(f"✅ ربات به گروه اضافه شد: {chat.title} ({chat.id})")
+
+    try:
+        await update.message.reply_text(
+            WELCOME_TEXT,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except Exception as e:
+        logger.error(f"خطا در ارسال پیام خوش‌آمد: {e}")
+
+
+# ---------- هندلر شومبول ----------
 async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    وقتی کاربر توی گروه یا چت خصوصی می‌نویسه «شومبول»،
-    ۲۰ شومبول متوسط بهش داده می‌شه.
-    """
     if not update.message or not update.effective_user:
         return
 
     user = update.effective_user
     user_id = user.id
 
-    # اطمینان از اینکه کاربر توی دیتابیس هست
     save_user(
         user_id=user.id,
         first_name=user.first_name or "",
@@ -147,7 +180,6 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username or "",
     )
 
-    # چک کردن cooldown
     last_claim = get_last_claim(user_id)
     now = datetime.now()
 
@@ -156,8 +188,7 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         remaining = SHOMBOOL_COOLDOWN - elapsed
 
         if remaining > 0:
-            # هنوز تو cooldown هست
-            remaining_int = int(remaining) + 1  # رند به بالا
+            remaining_int = int(remaining) + 1
             text = (
                 f"⏳ <b>صبر کن بابا!</b> 😤\n"
                 f"بعد از <b>{_format_remaining(remaining_int)}</b> "
@@ -166,7 +197,6 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text, parse_mode="HTML")
             return
 
-    # ---- دادن شومبول ----
     add_shombool(user_id, SHOMBOOL_AMOUNT)
     set_last_claim(user_id, now)
 
@@ -222,7 +252,6 @@ async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def shombool_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/shombool — نمایش موجودی شومبول."""
     user = update.effective_user
     amount = get_shombool(user.id)
     await update.message.reply_text(
@@ -232,7 +261,6 @@ async def shombool_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def top_shombool(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🏆 برترین‌های شومبول."""
     rows = get_top_shombool(10)
 
     if not rows:
@@ -280,6 +308,11 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
+    # 🎉 خوش‌آمد گروه — اول از همه ثبت بشه
+    app.add_handler(
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler)
+    )
+
     # دستورات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
@@ -290,8 +323,7 @@ def main():
     # دکمه‌های شیشه‌ای
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # ✅ هندلر «شومبول» — توی گروه و چت خصوصی
-    #    فقط پیام‌های متنی که کلمه‌ی «شومبول» توشون هست
+    # هندلر «شومبول»
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.Regex(r"شومبول"),
