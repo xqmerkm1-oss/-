@@ -1,8 +1,9 @@
 import os
 import html
+import asyncio
 import logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -30,17 +31,18 @@ TOKEN = os.getenv("BOT_TOKEN")
 START_TEXT = os.getenv(
     "START_TEXT",
     """سلام {mention} 👋
-شنیدم دلت شومبول میخواد🍌
-تو میتونی یه کصخل بامزه باشی برای به گایی هات برای ایران 🤡
+شنیدم دلت <b>شومبول</b> می‌خواد 🍌
+تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
-شوبول و نازسرین جمع کن تا بتونی کصخل بهتری باشی
+🎯 <b>شوبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
 
-شمارو بعضی وقتا به تخممون میگیریم
-عملکرد خوب که نه ولی تو میتونی کصخل نیو داشته باشی
-آپدیت های سالیانه میدیم بیرون
-مثل شما میتونیم یه کصخل باشیم
-پشتیبانی ۲۶ ساعته
-کاملا رایگان بعضی وقتا پولی"""
+━━━━━━━━━━━━━━━
+😎 شمارو بعضی وقتا به تخممون می‌گیریم
+📈 عملکرد خوب که نه، ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی
+🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
+🤝 مثل شما می‌تونیم یه کصخل باشیم
+🕐 پشتیبانی <b>۲۶ ساعته</b>
+💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
 )
 
 
@@ -55,7 +57,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username or "",
     )
 
-    # escape کردن نام برای جلوگیری از خطای Markdown
+    # escape کردن نام برای جلوگیری از خطای HTML
     safe_name = html.escape(user.first_name or "دوست")
     mention = f'<a href="tg://user?id={user.id}">{safe_name}</a>'
 
@@ -132,10 +134,21 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Exception while handling an update:", exc_info=context.error)
 
 
+# ---------- پاک کردن webhook قبل از polling ----------
+async def _clear_webhook():
+    """حذف webhook و پیام‌های معلق، برای جلوگیری از خطای 409 Conflict."""
+    async with Bot(TOKEN) as bot:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ Webhook پاک شد.")
+
+
 # ---------- main ----------
 def main():
     if not TOKEN:
         raise ValueError("BOT_TOKEN تنظیم نشده!")
+
+    # پاک کردن webhook قبل از شروع polling
+    asyncio.run(_clear_webhook())
 
     init_db()
 
@@ -148,7 +161,10 @@ def main():
     app.add_error_handler(error_handler)
 
     print("✅ ربات روشن شد...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":
