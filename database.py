@@ -28,6 +28,7 @@ def init_db():
                 last_name TEXT,
                 username TEXT,
                 gender TEXT,
+                jense TEXT,
                 created_at TEXT,
                 last_seen TEXT
             )
@@ -40,6 +41,11 @@ def init_db():
                 last_claim TEXT
             )
         """)
+        # اگه ستون jense از قبل نبود، اضافه کن (برای دیتابیس قدیمی)
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN jense TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 # ---------- کاربران ----------
@@ -65,11 +71,16 @@ def save_user(user_id, first_name, last_name, username):
         ))
 
 
-def save_gender(user_id, gender):
+def save_gender_info(user_id, gender, jense):
+    """
+    ثبت اطلاعات جنسیت.
+    gender: 'دختر' یا 'پسر'
+    jense:  'دارم' یا 'ندارم'
+    """
     with _connect() as conn:
         cursor = conn.execute(
-            "UPDATE users SET gender = ? WHERE user_id = ?",
-            (gender, user_id)
+            "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
+            (gender, jense, user_id)
         )
         return cursor.rowcount > 0
 
@@ -83,7 +94,7 @@ def get_user_count():
 def get_user_info(user_id):
     with _connect() as conn:
         cursor = conn.execute("""
-            SELECT user_id, first_name, last_name, username, gender, created_at, last_seen
+            SELECT user_id, first_name, last_name, username, gender, jense, created_at, last_seen
             FROM users WHERE user_id = ?
         """, (user_id,))
         row = cursor.fetchone()
@@ -97,8 +108,9 @@ def get_user_info(user_id):
         "last_name": row[2],
         "username": row[3],
         "gender": row[4],
-        "created_at": row[5],
-        "last_seen": row[6],
+        "jense": row[5],
+        "created_at": row[6],
+        "last_seen": row[7],
     }
 
 
