@@ -2,17 +2,15 @@ import os
 import sqlite3
 from datetime import datetime
 
-# مسیر دیتابیس: قابل تنظیم با متغیر محیطی، پیش‌فرض کنار پروژه
+# مسیر دیتابیس
 DB_NAME = os.getenv("DB_PATH", "bot_users.db")
 
-# اطمینان از وجود پوشه‌ی دیتابیس (اگه مسیر پوشه داشته باشه)
 _db_dir = os.path.dirname(DB_NAME)
 if _db_dir:
     os.makedirs(_db_dir, exist_ok=True)
 
 
 def _connect():
-    """اتصال به دیتابیس با WAL برای عملکرد بهتر."""
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
@@ -20,7 +18,6 @@ def _connect():
 
 def init_db():
     with _connect() as conn:
-        # جدول کاربران
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -33,7 +30,6 @@ def init_db():
                 last_seen TEXT
             )
         """)
-        # جدول شومبول‌ها
         conn.execute("""
             CREATE TABLE IF NOT EXISTS shombool (
                 user_id INTEGER PRIMARY KEY,
@@ -41,7 +37,7 @@ def init_db():
                 last_claim TEXT
             )
         """)
-        # اگه ستون jense از قبل نبود، اضافه کن (برای دیتابیس قدیمی)
+        # اضافه کردن ستون jense برای دیتابیس قدیمی
         try:
             conn.execute("ALTER TABLE users ADD COLUMN jense TEXT")
         except sqlite3.OperationalError:
@@ -50,7 +46,6 @@ def init_db():
 
 # ---------- کاربران ----------
 def save_user(user_id, first_name, last_name, username):
-    """ذخیره یا آپدیت کاربر با UPSERT."""
     now = datetime.now().isoformat()
     with _connect() as conn:
         conn.execute("""
@@ -72,11 +67,7 @@ def save_user(user_id, first_name, last_name, username):
 
 
 def save_gender_info(user_id, gender, jense):
-    """
-    ثبت اطلاعات جنسیت.
-    gender: 'دختر' یا 'پسر'
-    jense:  'دارم' یا 'ندارم'
-    """
+    """ثبت جنسیت + جنبه."""
     with _connect() as conn:
         cursor = conn.execute(
             "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
@@ -116,7 +107,6 @@ def get_user_info(user_id):
 
 # ---------- شومبول ----------
 def get_shombool(user_id):
-    """مقدار شومبول کاربر رو برمی‌گردونه (اگه نبود 0)."""
     with _connect() as conn:
         cursor = conn.execute(
             "SELECT amount FROM shombool WHERE user_id = ?",
@@ -127,18 +117,23 @@ def get_shombool(user_id):
 
 
 def add_shombool(user_id, amount):
-    """اضافه کردن شومبول به کاربر."""
+    """اضافه کردن شومبول. هر بار درست جمع می‌شه."""
     with _connect() as conn:
+        # اول مطمئن شو رکورد وجود داره
         conn.execute("""
             INSERT INTO shombool (user_id, amount)
-            VALUES (?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                amount = amount + excluded.amount
-        """, (user_id, amount))
+            VALUES (?, 0)
+            ON CONFLICT(user_id) DO NOTHING
+        """, (user_id,))
+        # بعد مقدار رو اضافه کن
+        conn.execute("""
+            UPDATE shombool
+            SET amount = amount + ?
+            WHERE user_id = ?
+        """, (amount, user_id))
 
 
 def get_last_claim(user_id):
-    """آخرین زمان درخواست شومبول رو برمی‌گردونه (datetime یا None)."""
     with _connect() as conn:
         cursor = conn.execute(
             "SELECT last_claim FROM shombool WHERE user_id = ?",
@@ -154,7 +149,6 @@ def get_last_claim(user_id):
 
 
 def set_last_claim(user_id, dt):
-    """ثبت زمان درخواست شومبول."""
     with _connect() as conn:
         conn.execute("""
             INSERT INTO shombool (user_id, amount, last_claim)
@@ -165,7 +159,6 @@ def set_last_claim(user_id, dt):
 
 
 def get_top_shombool(limit=10):
-    """برترین‌های شومبول."""
     with _connect() as conn:
         cursor = conn.execute("""
             SELECT s.user_id, s.amount, u.first_name
