@@ -37,7 +37,6 @@ def init_db():
                 last_claim TEXT
             )
         """)
-        # اضافه کردن ستون jense برای دیتابیس قدیمی
         try:
             conn.execute("ALTER TABLE users ADD COLUMN jense TEXT")
         except sqlite3.OperationalError:
@@ -67,7 +66,6 @@ def save_user(user_id, first_name, last_name, username):
 
 
 def save_gender_info(user_id, gender, jense):
-    """ثبت جنسیت + جنبه."""
     with _connect() as conn:
         cursor = conn.execute(
             "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
@@ -119,13 +117,11 @@ def get_shombool(user_id):
 def add_shombool(user_id, amount):
     """اضافه کردن شومبول. هر بار درست جمع می‌شه."""
     with _connect() as conn:
-        # اول مطمئن شو رکورد وجود داره
         conn.execute("""
             INSERT INTO shombool (user_id, amount)
             VALUES (?, 0)
             ON CONFLICT(user_id) DO NOTHING
         """, (user_id,))
-        # بعد مقدار رو اضافه کن
         conn.execute("""
             UPDATE shombool
             SET amount = amount + ?
