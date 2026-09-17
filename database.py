@@ -30,10 +30,12 @@ def init_db():
             )
         """)
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS shombool (
+            CREATE TABLE IF NOT EXISTS currency (
                 user_id INTEGER PRIMARY KEY,
-                amount INTEGER DEFAULT 0,
-                last_claim TEXT
+                shombool INTEGER DEFAULT 0,
+                chochol INTEGER DEFAULT 0,
+                last_shombool_claim TEXT,
+                last_chochol_claim TEXT
             )
         """)
         try:
@@ -42,6 +44,7 @@ def init_db():
             pass
 
 
+# ---------- کاربران ----------
 def save_user(user_id, first_name, last_name, username):
     now = datetime.now().isoformat()
     with _connect() as conn:
@@ -81,28 +84,50 @@ def get_user_info(user_id):
     }
 
 
+# ---------- ارزها ----------
+def _ensure_currency_row(user_id):
+    with _connect() as conn:
+        conn.execute("""
+            INSERT INTO currency (user_id) VALUES (?)
+            ON CONFLICT(user_id) DO NOTHING
+        """, (user_id,))
+
+
 def get_shombool(user_id):
     with _connect() as conn:
-        cursor = conn.execute("SELECT amount FROM shombool WHERE user_id = ?", (user_id,))
+        cursor = conn.execute("SELECT shombool FROM currency WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         return row[0] if row else 0
 
 
 def add_shombool(user_id, amount):
+    _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute("""
-            INSERT INTO shombool (user_id, amount) VALUES (?, 0)
-            ON CONFLICT(user_id) DO NOTHING
-        """, (user_id,))
         conn.execute(
-            "UPDATE shombool SET amount = amount + ? WHERE user_id = ?",
+            "UPDATE currency SET shombool = shombool + ? WHERE user_id = ?",
             (amount, user_id)
         )
 
 
-def get_last_claim(user_id):
+def get_chochol(user_id):
     with _connect() as conn:
-        cursor = conn.execute("SELECT last_claim FROM shombool WHERE user_id = ?", (user_id,))
+        cursor = conn.execute("SELECT chochol FROM currency WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def add_chochol(user_id, amount):
+    _ensure_currency_row(user_id)
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE currency SET chochol = chochol + ? WHERE user_id = ?",
+            (amount, user_id)
+        )
+
+
+def get_last_shombool_claim(user_id):
+    with _connect() as conn:
+        cursor = conn.execute("SELECT last_shombool_claim FROM currency WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         if not row or not row[0]:
             return None
@@ -112,20 +137,55 @@ def get_last_claim(user_id):
             return None
 
 
-def set_last_claim(user_id, dt):
+def set_last_shombool_claim(user_id, dt):
+    _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute("""
-            INSERT INTO shombool (user_id, amount, last_claim) VALUES (?, 0, ?)
-            ON CONFLICT(user_id) DO UPDATE SET last_claim = excluded.last_claim
-        """, (user_id, dt.isoformat()))
+        conn.execute(
+            "UPDATE currency SET last_shombool_claim = ? WHERE user_id = ?",
+            (dt.isoformat(), user_id)
+        )
+
+
+def get_last_chochol_claim(user_id):
+    with _connect() as conn:
+        cursor = conn.execute("SELECT last_chochol_claim FROM currency WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            return None
+        try:
+            return datetime.fromisoformat(row[0])
+        except ValueError:
+            return None
+
+
+def set_last_chochol_claim(user_id, dt):
+    _ensure_currency_row(user_id)
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE currency SET last_chochol_claim = ? WHERE user_id = ?",
+            (dt.isoformat(), user_id)
+        )
 
 
 def get_top_shombool(limit=10):
     with _connect() as conn:
         cursor = conn.execute("""
-            SELECT s.user_id, s.amount, u.first_name
-            FROM shombool s
-            LEFT JOIN users u ON u.user_id = s.user_id
-            ORDER BY s.amount DESC LIMIT ?
+            SELECT c.user_id, c.shombool, u.first_name
+            FROM currency c
+            LEFT JOIN users u ON u.user_id = c.user_id
+            WHERE c.shombool > 0
+            ORDER BY c.shombool DESC LIMIT ?
+        """, (limit,))
+        return cursor.fetchall()
+
+
+def get_top_chochol(limit=10):
+    with _connect() as conn:
+        cursor = conn.execute("""
+            SELECT c.user_id, c.chochol, u.first_name
+            FROM currency c
+            LEFT JOIN users u ON u.user_id = c.user_id
+            WHERE c.chochol > 0
+            ORDER BY c.chochol DESC LIMIT ?
         """, (limit,))
         return cursor.fetchall()
