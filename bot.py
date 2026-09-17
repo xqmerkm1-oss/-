@@ -34,101 +34,39 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# ⚙️ تنظیمات شومبول
 SHOMBOOL_AMOUNT = 5
 SHOMBOOL_COOLDOWN = 60
-
-# 📝 متن استارت اولیه (قبل از انتخاب جنسیت)
-START_TEXT = """سلام {mention} 👋
-شنیدم دلت <b>شومبول</b> می‌خواد 🍌
-تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
-
-🎯 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
-
-━━━━━━━━━━━━━━━
-😎 شمارو بعضی وقتا به تخممون می‌گیریم
-📈 عملکرد خوب که نه، ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی
-🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
-🤝 مثل شما می‌تونیم یه کصخل باشیم
-🕐 پشتیبانی <b>۲۶ ساعته</b>
-💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
 
 # 🎉 متن خوش‌آمد گروه
 WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
 پاشید <b>جق بزنید</b> 💦✊
 
 ━━━━━━━━━━━━━━━
-🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>
-🏆 برترین‌ها رو از دکمه‌ها ببینید 👇"""
+🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>"""
 
-# 📖 متن توضیحات کوتاه
-INFO_TEXT = """📖 <b>توضیحات کوتاه</b>
+# 📝 سوال جنسیت (فقط همین، بدون توضیح اضافه)
+GENDER_QUESTION = "🎭 <b>جنسیتت چیه؟</b>"
 
-🍌 <b>شومبول چیه؟</b>
-یه واحد پول خنده‌دار که با نوشتن کلمه‌ی «<b>شومبول</b>» توی گروه به دست میاد!
+# ---------- ۴ متن خوش‌آمد ----------
 
-⚙️ <b>چطور کار می‌کنه؟</b>
-• توی گروه <b>تنها</b> بنویس: <b>شومبول</b>
-• هر بار <b>۵ شومبول متوسط</b> می‌گیری
-• هر <b>۱ دقیقه</b> یه بار می‌تونی درخواست کنی
-
-🎯 <b>جنبه چیه؟</b>
-• <b>دختر با جنبه</b> → از <b>۱۰۰٪</b> ربات استفاده می‌کنه ✅
-• <b>دختر بی‌جنبه</b> → از <b>۱۰۰٪</b> ربات استفاده می‌کنه ✅
-• <b>پسر با جنبه</b> → از <b>۱۰۰٪</b> ربات استفاده می‌کنه ✅
-• <b>پسر بی‌جنبه</b> → فقط از یه چیزای کمش 😏
-
-🏆 <b>برترین‌ها</b>
-با جمع کردن شومبول، اسمت میره توی لیست برترین‌ها!
-
-━━━━━━━━━━━━━━━
-💡 برای شروع، جنسیتت رو انتخاب کن 👇"""
-
-# 📝 متن سوال جنسیت
-GENDER_QUESTION = """🎭 <b>جنسیتت چیه؟</b>
-
-یه توضیح کوتاه:
-• اگه <b>دختری و جنبه داری</b> → بزن رو «👧 دخترم، جنبه دارم»
-• اگه <b>دختری و جنبه نداری</b> → بزن رو «👧 دخترم، جنبه ندارم»
-• اگه <b>پسری و جنبه داری</b> → بزن رو «👦 پسرم، جنبه دارم»
-• اگه <b>پسری و جنبه نداری</b> → بزن رو «👦 پسرم، جنبه ندارم»
-
-━━━━━━━━━━━━━━━
-✅ <b>با جنبه‌ها</b> و <b>دخترای بی‌جنبه</b> → از <b>۱۰۰٪</b> ربات استفاده می‌کنن
-❌ <b>پسرای بی‌جنبه</b> → فقط از یه چیزای کمش 😏
-
-الان انتخاب کن 👇"""
-
-# 👧 متن خوش‌آمد: دختر با جنبه
+# 👧 دختر با جنبه
 WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 خوش اومدی به ربات ما 💖
 امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
 
 ✨ <b>خوبی این ربات اینکه</b> می‌تونی وجود خودتو به بقیه اثبات کنی 💫
 کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
-مخصوصاً اونایی که استارت کردن رباتو 🚀
+مخصوصاً اونایی که استارت کردن رباتو 🚀"""
 
-━━━━━━━━━━━━━━━
-👑 تو یه <b>دختر با جنبه</b> هستی
-می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 🎉
-
-🍌 برای شروع بنویس: <b>شومبول</b>"""
-
-# 👧 متن خوش‌آمد: دختر بی‌جنبه
+# 👧 دختر بی‌جنبه
 WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
 
 تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
 مخصوصاً اگه <b>ایرانی</b> باشن 🇮🇷
 
-🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
+🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی"""
 
-━━━━━━━━━━━━━━━
-👧 تو یه <b>دختر بی‌جنبه</b> هستی
-می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 🎉
-
-🍌 برای شروع بنویس: <b>شومبول</b>"""
-
-# 👦 متن خوش‌آمد: پسر با جنبه
+# 👦 پسر با جنبه
 WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 خوش اومدی به ربات ما 🎉
 امیدوارم که اینجا بهت خوش بگذره 🥳
@@ -138,15 +76,9 @@ WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 و جملات خوبی می‌تونی برای <b>افزایش اعتبار</b> استفاده کنی 📈
 
 همین دیگه، مونده <b>گار باشی</b> 💪
-فعلاً 👋
+فعلاً 👋"""
 
-━━━━━━━━━━━━━━━
-👑 تو یه <b>پسر با جنبه</b> هستی
-می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 🎉
-
-🍌 برای شروع بنویس: <b>شومبول</b>"""
-
-# 👦 متن خوش‌آمد: پسر بی‌جنبه
+# 👦 پسر بی‌جنبه
 WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
 تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
@@ -158,13 +90,7 @@ WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> �
 🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
 🤝 مثل شما می‌تونیم یه کصخل باشیم
 🕐 پشتیبانی <b>۲۶ ساعته</b>
-💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏
-
-━━━━━━━━━━━━━━━
-👦 تو یه <b>پسر بی‌جنبه</b> هستی
-فقط از یه چیزای کمش می‌تونی استفاده کنی 😏
-
-🍌 برای شروع بنویس: <b>شومبول</b>"""
+💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
 
 
 # ---------- کمکی ----------
@@ -190,19 +116,6 @@ def _gender_keyboard():
             InlineKeyboardButton("👦 پسرم، جنبه دارم", callback_data="g_boy_yes"),
             InlineKeyboardButton("👦 پسرم، جنبه ندارم", callback_data="g_boy_no"),
         ],
-        [
-            InlineKeyboardButton("📖 توضیحات کوتاه", callback_data="info"),
-        ],
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def _main_keyboard():
-    keyboard = [
-        [InlineKeyboardButton("📖 توضیحات کوتاه", callback_data="info")],
-        [InlineKeyboardButton("🍌 موجودی من", callback_data="my_balance")],
-        [InlineKeyboardButton("🏆 برترین‌ها", callback_data="top")],
-        [InlineKeyboardButton("👤 پروفایل من", callback_data="my_profile")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -218,15 +131,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username or "",
     )
 
-    safe_name = html.escape(user.first_name or "دوست")
-    mention = f'<a href="tg://user?id={user.id}">{safe_name}</a>'
-
-    await update.message.reply_text(
-        START_TEXT.format(mention=mention),
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-    )
-
+    # فقط سوال جنسیت + دکمه‌ها
     await update.message.reply_text(
         GENDER_QUESTION,
         parse_mode="HTML",
@@ -242,131 +147,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # 👧 دختر با جنبه
     if data == "g_girl_yes":
         ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
-            await query.edit_message_text(
-                WELCOME_GIRL_YES,
-                parse_mode="HTML",
-                reply_markup=_main_keyboard(),
-                disable_web_page_preview=True,
-            )
+            await query.edit_message_text(WELCOME_GIRL_YES, parse_mode="HTML")
         else:
-            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+            await query.edit_message_text("❌ اول /start بزن.")
 
-    # 👧 دختر بی‌جنبه
     elif data == "g_girl_no":
         ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
-            await query.edit_message_text(
-                WELCOME_GIRL_NO,
-                parse_mode="HTML",
-                reply_markup=_main_keyboard(),
-                disable_web_page_preview=True,
-            )
+            await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
         else:
-            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+            await query.edit_message_text("❌ اول /start بزن.")
 
-    # 👦 پسر با جنبه
     elif data == "g_boy_yes":
         ok = save_gender_info(user_id, "پسر", "دارم")
         if ok:
-            await query.edit_message_text(
-                WELCOME_BOY_YES,
-                parse_mode="HTML",
-                reply_markup=_main_keyboard(),
-                disable_web_page_preview=True,
-            )
+            await query.edit_message_text(WELCOME_BOY_YES, parse_mode="HTML")
         else:
-            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+            await query.edit_message_text("❌ اول /start بزن.")
 
-    # 👦 پسر بی‌جنبه
     elif data == "g_boy_no":
         ok = save_gender_info(user_id, "پسر", "ندارم")
         if ok:
-            await query.edit_message_text(
-                WELCOME_BOY_NO,
-                parse_mode="HTML",
-                reply_markup=_main_keyboard(),
-                disable_web_page_preview=True,
-            )
+            await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
         else:
-            await query.edit_message_text("❌ اول ربات رو استارت کن.")
-
-    # 📖 توضیحات
-    elif data == "info":
-        await query.edit_message_text(
-            INFO_TEXT,
-            parse_mode="HTML",
-            reply_markup=_main_keyboard(),
-            disable_web_page_preview=True,
-        )
-
-    # 🍌 موجودی
-    elif data == "my_balance":
-        amount = get_shombool(user_id)
-        await query.edit_message_text(
-            f"🍌 <b>موجودی شومبول تو</b>\n\n"
-            f"📦 انبار: <b>{amount}</b> شومبول\n\n"
-            f"💡 برای دریافت، توی گروه <b>تنها</b> بنویس: <b>شومبول</b>",
-            parse_mode="HTML",
-            reply_markup=_main_keyboard(),
-        )
-
-    # 🏆 برترین‌ها
-    elif data == "top":
-        rows = get_top_shombool(10)
-        if not rows:
-            await query.edit_message_text(
-                "🏆 هنوز کسی شومبول جمع نکرده!",
-                parse_mode="HTML",
-                reply_markup=_main_keyboard(),
-            )
-            return
-
-        medals = ["🥇", "🥈", "🥉"]
-        lines = ["🏆 <b>برترین‌های شومبول</b>\n"]
-        for i, (uid, amount, first_name) in enumerate(rows):
-            medal = medals[i] if i < 3 else f"{i+1}."
-            name = html.escape(first_name or "بی‌نام")
-            mention = f'<a href="tg://user?id={uid}">{name}</a>'
-            lines.append(f"{medal} {mention} — <b>{amount}</b> 🍌")
-
-        await query.edit_message_text(
-            "\n".join(lines),
-            parse_mode="HTML",
-            reply_markup=_main_keyboard(),
-            disable_web_page_preview=True,
-        )
-
-    # 👤 پروفایل
-    elif data == "my_profile":
-        info = get_user_info(user_id)
-        if not info:
-            await query.edit_message_text("❌ اول ربات رو استارت کن.")
-            return
-
-        shombool_amount = get_shombool(user_id)
-        full_name = f"{info['first_name']} {info['last_name']}".strip() or "بی‌نام"
-        username = f"@{info['username']}" if info["username"] else "نداری"
-        gender = info["gender"] or "ثبت نشده"
-        jense = info["jense"] or "ثبت نشده"
-
-        text = (
-            f"👤 <b>پروفایل تو</b>\n\n"
-            f"🆔 <code>{info['user_id']}</code>\n"
-            f"📛 {html.escape(full_name)}\n"
-            f"🔗 {html.escape(username)}\n"
-            f"⚧ جنسیت: <b>{gender}</b>\n"
-            f"🎭 جنبه: <b>{jense}</b>\n"
-            f"🍌 شومبول: <b>{shombool_amount}</b>"
-        )
-        await query.edit_message_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=_main_keyboard(),
-        )
+            await query.edit_message_text("❌ اول /start بزن.")
 
 
 # ---------- 🎉 خوش‌آمد گروه ----------
@@ -393,18 +200,14 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطا در ارسال پیام خوش‌آمد: {e}")
 
 
-# ---------- ✅ هندلر شومبول (فقط کلمه‌ی تنها) ----------
+# ---------- ✅ هندلر شومبول ----------
 async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    فقط وقتی کاربر «تنهایی» کلمه‌ی شومبول رو می‌نویسه، شومبول می‌گیره.
-    """
     if not update.message or not update.effective_user:
         return
 
     user = update.effective_user
     user_id = user.id
 
-    # چک: فقط کلمه‌ی «شومبول»
     message_text = (update.message.text or "").strip()
     cleaned = message_text.replace("🍌", "").strip()
 
@@ -435,7 +238,6 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text, parse_mode="HTML")
             return
 
-    # ✅ اضافه کردن شومبول (هر بار +۵)
     add_shombool(user_id, SHOMBOOL_AMOUNT)
     set_last_claim(user_id, now)
 
