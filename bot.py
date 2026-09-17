@@ -2,12 +2,11 @@ import os
 import html
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
-    CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
     ContextTypes,
@@ -17,7 +16,7 @@ from telegram.ext import (
 from database import (
     init_db,
     save_user,
-    save_gender,
+    save_gender_info,
     get_user_count,
     get_user_info,
     get_shombool,
@@ -40,32 +39,69 @@ TOKEN = os.getenv("BOT_TOKEN")
 SHOMBOOL_AMOUNT = 5           # مقدار هر دریافت
 SHOMBOOL_COOLDOWN = 60        # ثانیه
 
+# 📝 متن استارت
 START_TEXT = os.getenv(
     "START_TEXT",
     """سلام {mention} 👋
-شنیدم دلت <b>شومبول</b> می‌خواد 🍌
-تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
+شنیدم دلت شومبول می‌خواد 🍌
+تو می‌تونی یه کصخل بامزه باشی برای به‌گایی‌هات برای ایران 🤡
 
-🎯 <b>شوبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
+🎯 شومبول و نازسرین جمع کن تا بتونی کصخل بهتری باشی
 
 ━━━━━━━━━━━━━━━
 😎 شمارو بعضی وقتا به تخممون می‌گیریم
-📈 عملکرد خوب که نه، ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی
-🔄 <b>آپدیت‌های سالیانه</b> میدیم بیرون
+📈 عملکرد خوب که نه، ولی تو می‌تونی کصخل نیو داشته باشی
+🔄 آپدیت‌های سالیانه میدیم بیرون
 🤝 مثل شما می‌تونیم یه کصخل باشیم
-🕐 پشتیبانی <b>۲۶ ساعته</b>
-💰 کاملاً <b>رایگان</b> — بعضی وقتا پولی 😏"""
+🕐 پشتیبانی ۲۶ ساعته
+💰 کاملاً رایگان — بعضی وقتا پولی 😏"""
 )
 
-# 🎉 متن خوش‌آمد وقتی ربات به گروه اضافه می‌شه
+# 🎉 متن خوش‌آمد گروه
 WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
 پاشید <b>جق بزنید</b> 💦✊
 
 ━━━━━━━━━━━━━━━
 🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>
-🏆 برترین‌ها: /top
-📦 موجودی: /shombool
+🏆 برترین‌ها رو از دکمه‌ها ببینید 👇
 """
+
+# 📖 متن توضیحات کوتاه
+INFO_TEXT = """📖 <b>توضیحات کوتاه</b>
+
+🍌 <b>شومبول چیه؟</b>
+یه واحد پول خنده‌دار که با نوشتن کلمه‌ی «شومبول» توی گروه به دست میاد!
+
+⚙️ <b>چطور کار می‌کنه؟</b>
+• توی گروه بنویس: <b>شومبول</b>
+• هر بار <b>۵ شومبول متوسط</b> می‌گیری
+• هر <b>۱ دقیقه</b> یه بار می‌تونی درخواست کنی
+
+🎯 <b>جنبه چیه؟</b>
+• <b>با جنبه‌ها</b> می‌تونن از <b>۱۰۰٪</b> ربات استفاده کنن
+• <b>بی‌جنبه‌ها</b> فقط از یه چیزای کمش 😏
+
+🏆 <b>برترین‌ها</b>
+با جمع کردن شومبول، اسمت میره توی لیست برترین‌ها!
+
+━━━━━━━━━━━━━━━
+💡 برای شروع، جنسیتت رو انتخاب کن 👇
+"""
+
+# 📝 متن سوال جنسیت
+GENDER_QUESTION = """🎭 <b>جنسیتت چیه؟</b>
+
+یه توضیح کوتاه:
+• اگه <b>دختری و جنبه داری</b> → بزن رو «👧 دخترم، جنبه دارم»
+• اگه <b>دختری و جنبه نداری</b> → بزن رو «👧 دخترم، جنبه ندارم»
+• اگه <b>پسری و جنبه داری</b> → بزن رو «👦 پسرم، جنبه دارم»
+• اگه <b>پسری و جنبه نداری</b> → بزن رو «👦 پسرم، جنبه ندارم»
+
+━━━━━━━━━━━━━━━
+✅ <b>با جنبه‌ها</b> می‌تونن از <b>۱۰۰٪</b> ربات استفاده کنن
+❌ <b>بی‌جنبه‌ها</b> فقط از یه چیزای کمش 😏
+
+الان انتخاب کن 👇"""
 
 
 # ---------- کمکی ----------
@@ -81,8 +117,41 @@ def _format_remaining(seconds: int) -> str:
         return f"<b>{s}</b> ثانیه"
 
 
-# ---------- هندلرها ----------
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def _gender_keyboard():
+    """کیبورد ۴ دکمه‌ای جنسیت."""
+    keyboard = [
+        [
+            InlineKeyboardButton("👧 دخترم، جنبه دارم", callback_data="g_girl_yes"),
+            InlineKeyboardButton("👧 دخترم، جنبه ندارم", callback_data="g_girl_no"),
+        ],
+        [
+            InlineKeyboardButton("👦 پسرم، جنبه دارم", callback_data="g_boy_yes"),
+            InlineKeyboardButton("👦 پسرم، جنبه ندارم", callback_data="g_boy_no"),
+        ],
+        [
+            InlineKeyboardButton("📖 توضیحات کوتاه", callback_data="info"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _main_keyboard():
+    """کیبورد اصلی برای کاربر ثبت‌شده."""
+    keyboard = [
+        [InlineKeyboardButton("📖 توضیحات کوتاه", callback_data="info")],
+        [InlineKeyboardButton("🍌 موجودی من", callback_data="my_balance")],
+        [InlineKeyboardButton("🏆 برترین‌ها", callback_data="top")],
+        [InlineKeyboardButton("👤 پروفایل من", callback_data="my_profile")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ---------- هندلر استارت (خودکار) ----------
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    وقتی کاربر ربات رو استارت می‌کنه (چه با /start چه با لینک)،
+    مستقیم پیام خوش‌آمد + سوال جنسیت میاد.
+    """
     user = update.effective_user
 
     save_user(
@@ -95,46 +164,157 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     safe_name = html.escape(user.first_name or "دوست")
     mention = f'<a href="tg://user?id={user.id}">{safe_name}</a>'
 
-    keyboard = [
-        [InlineKeyboardButton("🚀 شروع به کار", callback_data="start_work")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
+    # پیام اول: متن استارت
     await update.message.reply_text(
         START_TEXT.format(mention=mention),
         parse_mode="HTML",
-        reply_markup=reply_markup,
+        disable_web_page_preview=True,
+    )
+
+    # پیام دوم: سوال جنسیت با ۴ دکمه + توضیحات
+    await update.message.reply_text(
+        GENDER_QUESTION,
+        parse_mode="HTML",
+        reply_markup=_gender_keyboard(),
     )
 
 
+# ---------- هندلر دکمه‌ها ----------
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "start_work":
-        keyboard = [
-            [InlineKeyboardButton("👧 من دخترم", callback_data="gender_girl")],
-            [InlineKeyboardButton("👦 من پسرم", callback_data="gender_boy")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    data = query.data
+    user_id = query.from_user.id
+
+    # ---------- جنسیت: دختر با جنبه ----------
+    if data == "g_girl_yes":
+        ok = save_gender_info(user_id, "دختر", "دارم")
+        if ok:
+            await query.edit_message_text(
+                "✅ ثبت شد!\n\n"
+                "👧 <b>دختر با جنبه</b> — خوش اومدی 🎉\n"
+                "می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 😎",
+                parse_mode="HTML",
+                reply_markup=_main_keyboard(),
+            )
+        else:
+            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+
+    # ---------- جنسیت: دختر بی‌جنبه ----------
+    elif data == "g_girl_no":
+        ok = save_gender_info(user_id, "دختر", "ندارم")
+        if ok:
+            await query.edit_message_text(
+                "✅ ثبت شد!\n\n"
+                "👧 <b>دختر بی‌جنبه</b> — خوش اومدی 🎉\n"
+                "فقط از یه چیزای کمش می‌تونی استفاده کنی 😏",
+                parse_mode="HTML",
+                reply_markup=_main_keyboard(),
+            )
+        else:
+            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+
+    # ---------- جنسیت: پسر با جنبه ----------
+    elif data == "g_boy_yes":
+        ok = save_gender_info(user_id, "پسر", "دارم")
+        if ok:
+            await query.edit_message_text(
+                "✅ ثبت شد!\n\n"
+                "👦 <b>پسر با جنبه</b> — خوش اومدی 🎉\n"
+                "می‌تونی از <b>۱۰۰٪</b> ربات استفاده کنی 😎",
+                parse_mode="HTML",
+                reply_markup=_main_keyboard(),
+            )
+        else:
+            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+
+    # ---------- جنسیت: پسر بی‌جنبه ----------
+    elif data == "g_boy_no":
+        ok = save_gender_info(user_id, "پسر", "ندارم")
+        if ok:
+            await query.edit_message_text(
+                "✅ ثبت شد!\n\n"
+                "👦 <b>پسر بی‌جنبه</b> — خوش اومدی 🎉\n"
+                "فقط از یه چیزای کمش می‌تونی استفاده کنی 😏",
+                parse_mode="HTML",
+                reply_markup=_main_keyboard(),
+            )
+        else:
+            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+
+    # ---------- توضیحات کوتاه ----------
+    elif data == "info":
         await query.edit_message_text(
-            "جنسیتت چیه؟ 🤔",
-            reply_markup=reply_markup,
+            INFO_TEXT,
+            parse_mode="HTML",
+            reply_markup=_main_keyboard(),
         )
 
-    elif query.data == "gender_girl":
-        ok = save_gender(query.from_user.id, "دختر")
-        if ok:
-            await query.edit_message_text("ثبت شد ✅\nخوش اومدی 👧")
-        else:
-            await query.edit_message_text("❌ اول /start بزن.")
+    # ---------- موجودی من ----------
+    elif data == "my_balance":
+        amount = get_shombool(user_id)
+        await query.edit_message_text(
+            f"🍌 <b>موجودی شومبول تو:</b>\n\n"
+            f"📦 انبار: <b>{amount}</b> شومبول\n\n"
+            f"💡 برای دریافت، توی گروه بنویس: <b>شومبول</b>",
+            parse_mode="HTML",
+            reply_markup=_main_keyboard(),
+        )
 
-    elif query.data == "gender_boy":
-        ok = save_gender(query.from_user.id, "پسر")
-        if ok:
-            await query.edit_message_text("ثبت شد ✅\nخوش اومدی 👦")
-        else:
-            await query.edit_message_text("❌ اول /start بزن.")
+    # ---------- برترین‌ها ----------
+    elif data == "top":
+        rows = get_top_shombool(10)
+        if not rows:
+            await query.edit_message_text(
+                "🏆 هنوز کسی شومبول جمع نکرده!",
+                parse_mode="HTML",
+                reply_markup=_main_keyboard(),
+            )
+            return
+
+        medals = ["🥇", "🥈", "🥉"]
+        lines = ["🏆 <b>برترین‌های شومبول</b>\n"]
+        for i, (uid, amount, first_name) in enumerate(rows):
+            medal = medals[i] if i < 3 else f"{i+1}."
+            name = html.escape(first_name or "بی‌نام")
+            mention = f'<a href="tg://user?id={uid}">{name}</a>'
+            lines.append(f"{medal} {mention} — <b>{amount}</b> 🍌")
+
+        await query.edit_message_text(
+            "\n".join(lines),
+            parse_mode="HTML",
+            reply_markup=_main_keyboard(),
+            disable_web_page_preview=True,
+        )
+
+    # ---------- پروفایل من ----------
+    elif data == "my_profile":
+        info = get_user_info(user_id)
+        if not info:
+            await query.edit_message_text("❌ اول ربات رو استارت کن.")
+            return
+
+        shombool_amount = get_shombool(user_id)
+        full_name = f"{info['first_name']} {info['last_name']}".strip() or "بی‌نام"
+        username = f"@{info['username']}" if info["username"] else "نداری"
+        gender = info["gender"] or "ثبت نشده"
+        jense = info["jense"] or "ثبت نشده"
+
+        text = (
+            f"👤 <b>پروفایل تو</b>\n\n"
+            f"🆔 <code>{info['user_id']}</code>\n"
+            f"📛 {html.escape(full_name)}\n"
+            f"🔗 {html.escape(username)}\n"
+            f"⚧ جنسیت: <b>{gender}</b>\n"
+            f"🎭 جنبه: <b>{jense}</b>\n"
+            f"🍌 شومبول: <b>{shombool_amount}</b>"
+        )
+        await query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=_main_keyboard(),
+        )
 
 
 # ---------- 🎉 خوش‌آمد گروه ----------
@@ -215,74 +395,6 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------- دستورات ----------
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    count = get_user_count()
-    await update.message.reply_text(
-        f"👥 کاربران: <b>{count}</b>",
-        parse_mode="HTML",
-    )
-
-
-async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    info = get_user_info(user.id)
-
-    if not info:
-        await update.message.reply_text("❌ اول /start بزن.")
-        return
-
-    shombool_amount = get_shombool(user.id)
-
-    full_name = f"{info['first_name']} {info['last_name']}".strip() or "بی‌نام"
-    username = f"@{info['username']}" if info["username"] else "نداری"
-    gender = info["gender"] or "ثبت نشده"
-
-    text = (
-        f"🆔 <code>{info['user_id']}</code>\n"
-        f"👤 {html.escape(full_name)}\n"
-        f"📛 {html.escape(username)}\n"
-        f"⚧ جنسیت: {gender}\n"
-        f"🍌 شومبول: <b>{shombool_amount}</b>"
-    )
-    await update.message.reply_text(text, parse_mode="HTML")
-
-
-async def shombool_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    amount = get_shombool(user.id)
-    await update.message.reply_text(
-        f"🍌 شومبول‌های موجود در انبار تو: <b>{amount}</b>",
-        parse_mode="HTML",
-    )
-
-
-async def top_shombool(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = get_top_shombool(10)
-
-    if not rows:
-        await update.message.reply_text(
-            "🏆 هنوز کسی شومبول جمع نکرده!",
-            parse_mode="HTML",
-        )
-        return
-
-    medals = ["🥇", "🥈", "🥉"]
-    lines = ["🏆 <b>برترین‌های شومبول</b>\n"]
-
-    for i, (user_id, amount, first_name) in enumerate(rows):
-        medal = medals[i] if i < 3 else f"{i+1}."
-        name = html.escape(first_name or "بی‌نام")
-        mention = f'<a href="tg://user?id={user_id}">{name}</a>'
-        lines.append(f"{medal} {mention} — <b>{amount}</b> 🍌")
-
-    await update.message.reply_text(
-        "\n".join(lines),
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-    )
-
-
 # ---------- خطاها ----------
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Exception while handling an update:", exc_info=context.error)
@@ -305,17 +417,15 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
-    # 🎉 خوش‌آمد گروه — اول از همه ثبت بشه
+    # 🎉 خوش‌آمد گروه
     app.add_handler(
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler)
     )
 
-    # دستورات
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("me", me))
-    app.add_handler(CommandHandler("shombool", shombool_balance))
-    app.add_handler(CommandHandler("top", top_shombool))
+    # 🚀 استارت (خودکار — هر پیامی که /start باشه یا اولین پیام کاربر)
+    app.add_handler(
+        MessageHandler(filters.Regex(r"^/start"), start_handler)
+    )
 
     # دکمه‌های شیشه‌ای
     app.add_handler(CallbackQueryHandler(button_handler))
