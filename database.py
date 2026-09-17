@@ -2,7 +2,6 @@ import os
 import sqlite3
 from datetime import datetime
 
-# مسیر دیتابیس
 DB_NAME = os.getenv("DB_PATH", "bot_users.db")
 
 _db_dir = os.path.dirname(DB_NAME)
@@ -43,7 +42,6 @@ def init_db():
             pass
 
 
-# ---------- کاربران ----------
 def save_user(user_id, first_name, last_name, username):
     now = datetime.now().isoformat()
     with _connect() as conn:
@@ -55,14 +53,7 @@ def save_user(user_id, first_name, last_name, username):
                 last_name  = excluded.last_name,
                 username   = excluded.username,
                 last_seen  = excluded.last_seen
-        """, (
-            user_id,
-            first_name or "",
-            last_name or "",
-            username or "",
-            now,
-            now,
-        ))
+        """, (user_id, first_name or "", last_name or "", username or "", now, now))
 
 
 def save_gender_info(user_id, gender, jense):
@@ -74,12 +65,6 @@ def save_gender_info(user_id, gender, jense):
         return cursor.rowcount > 0
 
 
-def get_user_count():
-    with _connect() as conn:
-        cursor = conn.execute("SELECT COUNT(*) FROM users")
-        return cursor.fetchone()[0]
-
-
 def get_user_info(user_id):
     with _connect() as conn:
         cursor = conn.execute("""
@@ -87,54 +72,37 @@ def get_user_info(user_id):
             FROM users WHERE user_id = ?
         """, (user_id,))
         row = cursor.fetchone()
-
     if not row:
         return None
-
     return {
-        "user_id": row[0],
-        "first_name": row[1],
-        "last_name": row[2],
-        "username": row[3],
-        "gender": row[4],
-        "jense": row[5],
-        "created_at": row[6],
-        "last_seen": row[7],
+        "user_id": row[0], "first_name": row[1], "last_name": row[2],
+        "username": row[3], "gender": row[4], "jense": row[5],
+        "created_at": row[6], "last_seen": row[7],
     }
 
 
-# ---------- شومبول ----------
 def get_shombool(user_id):
     with _connect() as conn:
-        cursor = conn.execute(
-            "SELECT amount FROM shombool WHERE user_id = ?",
-            (user_id,)
-        )
+        cursor = conn.execute("SELECT amount FROM shombool WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         return row[0] if row else 0
 
 
 def add_shombool(user_id, amount):
-    """اضافه کردن شومبول. هر بار درست جمع می‌شه."""
     with _connect() as conn:
         conn.execute("""
-            INSERT INTO shombool (user_id, amount)
-            VALUES (?, 0)
+            INSERT INTO shombool (user_id, amount) VALUES (?, 0)
             ON CONFLICT(user_id) DO NOTHING
         """, (user_id,))
-        conn.execute("""
-            UPDATE shombool
-            SET amount = amount + ?
-            WHERE user_id = ?
-        """, (amount, user_id))
+        conn.execute(
+            "UPDATE shombool SET amount = amount + ? WHERE user_id = ?",
+            (amount, user_id)
+        )
 
 
 def get_last_claim(user_id):
     with _connect() as conn:
-        cursor = conn.execute(
-            "SELECT last_claim FROM shombool WHERE user_id = ?",
-            (user_id,)
-        )
+        cursor = conn.execute("SELECT last_claim FROM shombool WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         if not row or not row[0]:
             return None
@@ -147,10 +115,8 @@ def get_last_claim(user_id):
 def set_last_claim(user_id, dt):
     with _connect() as conn:
         conn.execute("""
-            INSERT INTO shombool (user_id, amount, last_claim)
-            VALUES (?, 0, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                last_claim = excluded.last_claim
+            INSERT INTO shombool (user_id, amount, last_claim) VALUES (?, 0, ?)
+            ON CONFLICT(user_id) DO UPDATE SET last_claim = excluded.last_claim
         """, (user_id, dt.isoformat()))
 
 
@@ -160,7 +126,6 @@ def get_top_shombool(limit=10):
             SELECT s.user_id, s.amount, u.first_name
             FROM shombool s
             LEFT JOIN users u ON u.user_id = s.user_id
-            ORDER BY s.amount DESC
-            LIMIT ?
+            ORDER BY s.amount DESC LIMIT ?
         """, (limit,))
         return cursor.fetchall()
