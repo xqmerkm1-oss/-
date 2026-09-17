@@ -25,11 +25,15 @@ from database import (
     get_top_shombool,
 )
 
-# ---------- تنظیمات ----------
+# ---------- لاگ ----------
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+# خاموش کردن لاگ‌های httpx (توکن لو نره)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -49,7 +53,7 @@ GENDER_QUESTION = "🎭 <b>جنسیتت چیه؟</b>"
 
 # ---------- ۴ متن خوش‌آمد ----------
 
-# 👧 دختر با جنبه
+# 👧 دختر با جنبه → «سلام خانوم محترم»
 WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 خوش اومدی به ربات ما 💖
 امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
@@ -58,7 +62,7 @@ WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
 مخصوصاً اونایی که استارت کردن رباتو 🚀"""
 
-# 👧 دختر بی‌جنبه
+# 👧 دختر بی‌جنبه → «سلام شنیدم که می‌خوای کصخل باشی»
 WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
 
 تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
@@ -66,7 +70,7 @@ WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل �
 
 🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی"""
 
-# 👦 پسر با جنبه
+# 👦 پسر با جنبه → «سلام آقای خوشتیپ»
 WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 خوش اومدی به ربات ما 🎉
 امیدوارم که اینجا بهت خوش بگذره 🥳
@@ -78,7 +82,7 @@ WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 همین دیگه، مونده <b>گار باشی</b> 💪
 فعلاً 👋"""
 
-# 👦 پسر بی‌جنبه
+# 👦 پسر بی‌جنبه → «شنیدم دلت شومبول می‌خواد»
 WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
 تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
@@ -147,6 +151,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
+    # 👧 دختر با جنبه → «سلام خانوم محترم»
     if data == "g_girl_yes":
         ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
@@ -154,6 +159,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
+    # 👧 دختر بی‌جنبه → «سلام شنیدم که می‌خوای کصخل باشی»
     elif data == "g_girl_no":
         ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
@@ -161,6 +167,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
+    # 👦 پسر با جنبه → «سلام آقای خوشتیپ»
     elif data == "g_boy_yes":
         ok = save_gender_info(user_id, "پسر", "دارم")
         if ok:
@@ -168,6 +175,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
+    # 👦 پسر بی‌جنبه → «شنیدم دلت شومبول می‌خواد»
     elif data == "g_boy_no":
         ok = save_gender_info(user_id, "پسر", "ندارم")
         if ok:
