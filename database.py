@@ -25,7 +25,6 @@ def init_db():
                 username TEXT,
                 gender TEXT,
                 jense TEXT,
-                jense_logic TEXT,
                 created_at TEXT,
                 last_seen TEXT
             )
@@ -45,12 +44,10 @@ def init_db():
                 warning_count INTEGER DEFAULT 0
             )
         """)
-        # اضافه کردن ستون‌های جدید برای دیتابیس قدیمی
-        for col in ["jense", "jense_logic"]:
-            try:
-                conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
-            except sqlite3.OperationalError:
-                pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN jense TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 # ---------- کاربران ----------
@@ -68,16 +65,12 @@ def save_user(user_id, first_name, last_name, username):
         """, (user_id, first_name or "", last_name or "", username or "", now, now))
 
 
-def save_gender_info(user_id, gender, jense, jense_logic):
-    """
-    gender: 'دختر' یا 'پسر'
-    jense: چیزی که کاربر انتخاب کرده ('دارم' / 'ندارم')
-    jense_logic: منطق داخلی برای دسترسی ('دارم' / 'ندارم')
-    """
+def save_gender_info(user_id, gender, jense):
+    """gender: دختر/پسر | jense: دارم/ندارم"""
     with _connect() as conn:
         cursor = conn.execute(
-            "UPDATE users SET gender = ?, jense = ?, jense_logic = ? WHERE user_id = ?",
-            (gender, jense, jense_logic, user_id)
+            "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
+            (gender, jense, user_id)
         )
         return cursor.rowcount > 0
 
@@ -85,7 +78,7 @@ def save_gender_info(user_id, gender, jense, jense_logic):
 def get_user_info(user_id):
     with _connect() as conn:
         cursor = conn.execute("""
-            SELECT user_id, first_name, last_name, username, gender, jense, jense_logic, created_at, last_seen
+            SELECT user_id, first_name, last_name, username, gender, jense, created_at, last_seen
             FROM users WHERE user_id = ?
         """, (user_id,))
         row = cursor.fetchone()
@@ -94,7 +87,7 @@ def get_user_info(user_id):
     return {
         "user_id": row[0], "first_name": row[1], "last_name": row[2],
         "username": row[3], "gender": row[4], "jense": row[5],
-        "jense_logic": row[6], "created_at": row[7], "last_seen": row[8],
+        "created_at": row[6], "last_seen": row[7],
     }
 
 
@@ -117,10 +110,7 @@ def get_shombool(user_id):
 def add_shombool(user_id, amount):
     _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute(
-            "UPDATE currency SET shombool = shombool + ? WHERE user_id = ?",
-            (amount, user_id)
-        )
+        conn.execute("UPDATE currency SET shombool = shombool + ? WHERE user_id = ?", (amount, user_id))
 
 
 def reset_shombool(user_id):
@@ -139,10 +129,7 @@ def get_chochol(user_id):
 def add_chochol(user_id, amount):
     _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute(
-            "UPDATE currency SET chochol = chochol + ? WHERE user_id = ?",
-            (amount, user_id)
-        )
+        conn.execute("UPDATE currency SET chochol = chochol + ? WHERE user_id = ?", (amount, user_id))
 
 
 def reset_chochol(user_id):
@@ -166,10 +153,7 @@ def get_last_shombool_claim(user_id):
 def set_last_shombool_claim(user_id, dt):
     _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute(
-            "UPDATE currency SET last_shombool_claim = ? WHERE user_id = ?",
-            (dt.isoformat(), user_id)
-        )
+        conn.execute("UPDATE currency SET last_shombool_claim = ? WHERE user_id = ?", (dt.isoformat(), user_id))
 
 
 def get_last_chochol_claim(user_id):
@@ -187,10 +171,7 @@ def get_last_chochol_claim(user_id):
 def set_last_chochol_claim(user_id, dt):
     _ensure_currency_row(user_id)
     with _connect() as conn:
-        conn.execute(
-            "UPDATE currency SET last_chochol_claim = ? WHERE user_id = ?",
-            (dt.isoformat(), user_id)
-        )
+        conn.execute("UPDATE currency SET last_chochol_claim = ? WHERE user_id = ?", (dt.isoformat(), user_id))
 
 
 # ---------- ضد سلف ----------
