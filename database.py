@@ -25,6 +25,7 @@ def init_db():
                 username TEXT,
                 gender TEXT,
                 jense TEXT,
+                jense_logic TEXT,
                 created_at TEXT,
                 last_seen TEXT
             )
@@ -38,10 +39,18 @@ def init_db():
                 last_chochol_claim TEXT
             )
         """)
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN jense TEXT")
-        except sqlite3.OperationalError:
-            pass
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS warnings (
+                user_id INTEGER PRIMARY KEY,
+                warning_count INTEGER DEFAULT 0
+            )
+        """)
+        # اضافه کردن ستون‌های جدید برای دیتابیس قدیمی
+        for col in ["jense", "jense_logic"]:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
 
 
 # ---------- کاربران ----------
@@ -59,11 +68,16 @@ def save_user(user_id, first_name, last_name, username):
         """, (user_id, first_name or "", last_name or "", username or "", now, now))
 
 
-def save_gender_info(user_id, gender, jense):
+def save_gender_info(user_id, gender, jense, jense_logic):
+    """
+    gender: 'دختر' یا 'پسر'
+    jense: چیزی که کاربر انتخاب کرده ('دارم' / 'ندارم')
+    jense_logic: منطق داخلی برای دسترسی ('دارم' / 'ندارم')
+    """
     with _connect() as conn:
         cursor = conn.execute(
-            "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
-            (gender, jense, user_id)
+            "UPDATE users SET gender = ?, jense = ?, jense_logic = ? WHERE user_id = ?",
+            (gender, jense, jense_logic, user_id)
         )
         return cursor.rowcount > 0
 
@@ -71,7 +85,7 @@ def save_gender_info(user_id, gender, jense):
 def get_user_info(user_id):
     with _connect() as conn:
         cursor = conn.execute("""
-            SELECT user_id, first_name, last_name, username, gender, jense, created_at, last_seen
+            SELECT user_id, first_name, last_name, username, gender, jense, jense_logic, created_at, last_seen
             FROM users WHERE user_id = ?
         """, (user_id,))
         row = cursor.fetchone()
@@ -80,7 +94,7 @@ def get_user_info(user_id):
     return {
         "user_id": row[0], "first_name": row[1], "last_name": row[2],
         "username": row[3], "gender": row[4], "jense": row[5],
-        "created_at": row[6], "last_seen": row[7],
+        "jense_logic": row[6], "created_at": row[7], "last_seen": row[8],
     }
 
 
@@ -109,6 +123,12 @@ def add_shombool(user_id, amount):
         )
 
 
+def reset_shombool(user_id):
+    _ensure_currency_row(user_id)
+    with _connect() as conn:
+        conn.execute("UPDATE currency SET shombool = 0 WHERE user_id = ?", (user_id,))
+
+
 def get_chochol(user_id):
     with _connect() as conn:
         cursor = conn.execute("SELECT chochol FROM currency WHERE user_id = ?", (user_id,))
@@ -123,6 +143,12 @@ def add_chochol(user_id, amount):
             "UPDATE currency SET chochol = chochol + ? WHERE user_id = ?",
             (amount, user_id)
         )
+
+
+def reset_chochol(user_id):
+    _ensure_currency_row(user_id)
+    with _connect() as conn:
+        conn.execute("UPDATE currency SET chochol = 0 WHERE user_id = ?", (user_id,))
 
 
 def get_last_shombool_claim(user_id):
@@ -167,6 +193,30 @@ def set_last_chochol_claim(user_id, dt):
         )
 
 
+# ---------- ضد سلف ----------
+def get_warning_count(user_id):
+    with _connect() as conn:
+        cursor = conn.execute("SELECT warning_count FROM warnings WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def add_warning(user_id):
+    with _connect() as conn:
+        conn.execute("""
+            INSERT INTO warnings (user_id, warning_count) VALUES (?, 1)
+            ON CONFLICT(user_id) DO UPDATE SET warning_count = warning_count + 1
+        """, (user_id,))
+        cursor = conn.execute("SELECT warning_count FROM warnings WHERE user_id = ?", (user_id,))
+        return cursor.fetchone()[0]
+
+
+def reset_warnings(user_id):
+    with _connect() as conn:
+        conn.execute("DELETE FROM warnings WHERE user_id = ?", (user_id,))
+
+
+# ---------- برترین‌ها ----------
 def get_top_shombool(limit=10):
     with _connect() as conn:
         cursor = conn.execute("""
