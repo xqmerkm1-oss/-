@@ -2,7 +2,7 @@ import os
 import html
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -49,10 +49,10 @@ TOKEN = os.getenv("BOT_TOKEN")
 
 SHOMBOOL_AMOUNT = 5
 CHOCHOL_AMOUNT = 5
-COOLDOWN = 180              # 3 دقیقه
-MAX_WARNINGS = 3            # 3 بار اخطار
-SELF_BOT_WINDOW = 5         # اگه توی 5 ثانیه بیشتر از 3 بار تکرار کرد → سلف
-SELF_BOT_THRESHOLD = 3      # تعداد تکرار توی پنجره
+COOLDOWN = 180
+MAX_WARNINGS = 3
+SELF_BOT_WINDOW = 5
+SELF_BOT_THRESHOLD = 3
 
 # 🎉 متن خوش‌آمد گروه
 WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
@@ -66,7 +66,7 @@ GENDER_QUESTION = "🎭 <b>جنسیتت چیه؟</b>"
 
 # ---------- ۴ متن خوش‌آمد ----------
 
-# 👧 دختر با جنبه (دکمه: «دخترم، جنبه ندارم»)
+# 👧 دختر با جنبه (دکمه: «دخترم، جنبه دارم»)
 WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 خوش اومدی به ربات ما 💖
 امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
@@ -75,7 +75,7 @@ WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
 مخصوصاً اونایی که استارت کردن رباتو 🚀"""
 
-# 👧 دختر بی‌جنبه (دکمه: «دخترم، جنبه دارم»)
+# 👧 دختر بی‌جنبه (دکمه: «دخترم، جنبه ندارم»)
 WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
 
 تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
@@ -83,7 +83,7 @@ WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل �
 
 🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی"""
 
-# 👦 پسر با جنبه (دکمه: «پسرم، جنبه ندارم»)
+# 👦 پسر با جنبه (دکمه: «پسرم، جنبه دارم»)
 WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 خوش اومدی به ربات ما 🎉
 امیدوارم که اینجا بهت خوش بگذره 🥳
@@ -95,7 +95,7 @@ WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 همین دیگه، مونده <b>گار باشی</b> 💪
 فعلاً 👋"""
 
-# 👦 پسر بی‌جنبه (دکمه: «پسرم، جنبه دارم»)
+# 👦 پسر بی‌جنبه (دکمه: «پسرم، جنبه ندارم»)
 WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
 تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
@@ -139,40 +139,26 @@ def _gender_keyboard():
 
 # ---------- ضد سلف ----------
 async def _check_self_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """
-    چک می‌کنه آیا کاربر داره سلف‌بات می‌زنه.
-    اگه توی ۵ ثانیه بیشتر از ۳ بار کلمه رو تکرار کرد → سلف‌بات.
-    اگه تشخیص داد → اخطار می‌ده و True برمی‌گردونه.
-    اگه ۳ بار اخطار گرفت → ارز صفر می‌شه.
-    """
     user_id = update.effective_user.id
     now = datetime.now()
 
-    # ذخیره‌ی زمان‌های اخیر توی context.user_data
     key = "self_bot_times"
     if key not in context.user_data:
         context.user_data[key] = []
 
     times = context.user_data[key]
-
-    # فقط زمان‌های اخیر (توی پنجره‌ی ۵ ثانیه) رو نگه دار
     times = [t for t in times if (now - t).total_seconds() < SELF_BOT_WINDOW]
     times.append(now)
     context.user_data[key] = times
 
-    # اگه بیشتر از آستانه بود → سلف‌بات
     if len(times) > SELF_BOT_THRESHOLD:
-        # پاک کردن لیست تا دوباره اخطار بده
         context.user_data[key] = []
-
         warning_count = add_warning(user_id)
 
         if warning_count >= MAX_WARNINGS:
-            # صفر کردن ارز
             reset_shombool(user_id)
             reset_chochol(user_id)
             reset_warnings(user_id)
-
             await update.message.reply_text(
                 "🚫 <b>سلف‌بات شناسایی شد!</b>\n\n"
                 "❌ <b>۳ بار اخطار گرفتی</b>\n"
@@ -203,7 +189,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_name=user.last_name or "",
         username=user.username or "",
     )
-    # پاک کردن وضعیت سلف‌بات
     context.user_data.pop("self_bot_times", None)
 
     await update.message.reply_text(
@@ -221,35 +206,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # «دخترم، جنبه دارم» → کاربر می‌گه جنبه دارم → ولی منطق داخلی: ندارم
+    # «دخترم، جنبه دارم» → دختر با جنبه
     if data == "g_girl_yes":
-        ok = save_gender_info(user_id, "دختر", "دارم", "ندارم")
-        if ok:
-            await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
-        else:
-            await query.edit_message_text("❌ اول /start بزن.")
-
-    # «دخترم، جنبه ندارم» → کاربر می‌گه جنبه ندارم → ولی منطق داخلی: دارم
-    elif data == "g_girl_no":
-        ok = save_gender_info(user_id, "دختر", "ندارم", "دارم")
+        ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
             await query.edit_message_text(WELCOME_GIRL_YES, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
-    # «پسرم، جنبه دارم» → کاربر می‌گه جنبه دارم → ولی منطق داخلی: ندارم
-    elif data == "g_boy_yes":
-        ok = save_gender_info(user_id, "پسر", "دارم", "ندارم")
+    # «دخترم، جنبه ندارم» → دختر بی‌جنبه
+    elif data == "g_girl_no":
+        ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
-            await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
+            await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
-    # «پسرم، جنبه ندارم» → کاربر می‌گه جنبه ندارم → ولی منطق داخلی: دارم
-    elif data == "g_boy_no":
-        ok = save_gender_info(user_id, "پسر", "ندارم", "دارم")
+    # «پسرم، جنبه دارم» → پسر با جنبه
+    elif data == "g_boy_yes":
+        ok = save_gender_info(user_id, "پسر", "دارم")
         if ok:
             await query.edit_message_text(WELCOME_BOY_YES, parse_mode="HTML")
+        else:
+            await query.edit_message_text("❌ اول /start بزن.")
+
+    # «پسرم، جنبه ندارم» → پسر بی‌جنبه
+    elif data == "g_boy_no":
+        ok = save_gender_info(user_id, "پسر", "ندارم")
+        if ok:
+            await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
         else:
             await query.edit_message_text("❌ اول /start بزن.")
 
@@ -264,9 +249,6 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not added_bot:
         return
-
-    chat = update.effective_chat
-    logger.info(f"✅ ربات به گروه اضافه شد: {chat.title} ({chat.id})")
 
     try:
         await update.message.reply_text(
@@ -292,7 +274,6 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cleaned != "شومبول":
         return
 
-    # چک سلف‌بات
     if await _check_self_bot(update, context):
         return
 
@@ -301,10 +282,10 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     gender = info.get("gender")
-    jense_logic = info.get("jense_logic")
+    jense = info.get("jense")
 
-    # فقط پسر با جنبه (jense_logic == 'دارم')
-    if not (gender == "پسر" and jense_logic == "دارم"):
+    # فقط پسر با جنبه (jense == 'دارم')
+    if not (gender == "پسر" and jense == "دارم"):
         if gender == "دختر":
             await update.message.reply_text(
                 "❌ <b>دخترا نمی‌تونن شومبول بزنن!</b>\n"
@@ -373,7 +354,6 @@ async def chochol_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cleaned != "چوچول":
         return
 
-    # چک سلف‌بات
     if await _check_self_bot(update, context):
         return
 
@@ -382,10 +362,10 @@ async def chochol_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     gender = info.get("gender")
-    jense_logic = info.get("jense_logic")
+    jense = info.get("jense")
 
-    # فقط دختر با جنبه (jense_logic == 'دارم')
-    if not (gender == "دختر" and jense_logic == "دارم"):
+    # فقط دختر با جنبه (jense == 'دارم')
+    if not (gender == "دختر" and jense == "دارم"):
         if gender == "پسر":
             await update.message.reply_text(
                 "❌ <b>پسرا نمی‌تونن چوچول بزنن!</b>\n"
@@ -472,7 +452,6 @@ def main():
 
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # هندلر شومبول (فقط پسر با جنبه)
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -480,7 +459,6 @@ def main():
         )
     )
 
-    # هندلر چوچول (فقط دختر با جنبه)
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
