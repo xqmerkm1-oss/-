@@ -18,6 +18,7 @@ from database import (
     save_user,
     save_gender_info,
     get_user_info,
+    has_gender,
     get_shombool,
     add_shombool,
     reset_shombool,
@@ -61,15 +62,16 @@ WELCOME_TEXT = """🎉 <b>یه جقی وارد گروه شده</b> 🍌
 ━━━━━━━━━━━━━━━
 🍌 برای دریافت شومبول بنویسید: <b>شومبول</b>"""
 
-# 📝 سوال جنسیت (هم برای استارت، هم برای گروه)
+# 📝 سوال جنسیت
 GENDER_QUESTION = """🎭 <b>جنسیتت چیه؟</b>
 
-⚠️ <b>فقط یه بار</b> می‌تونی انتخاب کنی!"""
+━━━━━━━━━━━━━━━
+💡 برای استفاده از ربات، اول جنسیتت رو انتخاب کن:"""
 
-# ---------- ۴ متن خوش‌آمد (طبق پیامت) ----------
+# ---------- ۴ متن خوش‌آمد ----------
 
-# 👧 دخترم، جنبه ندارم → «سلام خانوم محترم»
-WELCOME_GIRL_NO = """🌸 <b>سلام خانوم محترم</b> 🌸
+# 👧 دختر با جنبه (دکمه: «دخترم، جنبه دارم»)
+WELCOME_GIRL_YES = """🌸 <b>سلام خانوم محترم</b> 🌸
 خوش اومدی به ربات ما 💖
 امیدوارم که بمونی با قلب سفید، شایدم قرمز ❤️🤍
 
@@ -77,16 +79,16 @@ WELCOME_GIRL_NO = """🌸 <b>سلام خانوم محترم</b> 🌸
 کلاً ربات خوبیه، هرکی استفاده کرده راضی بود 😍
 مخصوصاً اونایی که استارت کردن رباتو 🚀"""
 
-# 👧 دخترم، جنبه دارم → «سلام شنیدم که می‌خوای کصخل باشی»
-WELCOME_GIRL_YES = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
+# 👧 دختر بی‌جنبه (دکمه: «دخترم، جنبه ندارم»)
+WELCOME_GIRL_NO = """😏 <b>سلام شنیدم که می‌خوای کصخل باشی</b> 🤡
 
 تو می‌تونی یه <b>کصخل گوگولی</b> باشی که خیلیا تو رو دوست خواهند داشت 🥰
 مخصوصاً اگه <b>ایرانی</b> باشن 🇮🇷
 
 🍌 <b>شومبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی 🚀"""
 
-# 👦 پسرم، جنبه ندارم → «سلام آقای خوشتیپ»
-WELCOME_BOY_NO = """😎 <b>سلام آقای خوشتیپ</b> 😎
+# 👦 پسر با جنبه (دکمه: «پسرم، جنبه دارم»)
+WELCOME_BOY_YES = """😎 <b>سلام آقای خوشتیپ</b> 😎
 خوش اومدی به ربات ما 🎉
 امیدوارم که اینجا بهت خوش بگذره 🥳
 
@@ -97,8 +99,8 @@ WELCOME_BOY_NO = """😎 <b>سلام آقای خوشتیپ</b> 😎
 همین دیگه، مونده <b>گار باشی</b> 💪
 فعلاً 👋"""
 
-# 👦 پسرم، جنبه دارم → «شنیدم دلت شومبول می‌خواد»
-WELCOME_BOY_YES = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
+# 👦 پسر بی‌جنبه (دکمه: «پسرم، جنبه ندارم»)
+WELCOME_BOY_NO = """🍌 <b>شنیدم دلت شومبول می‌خواد</b> 🍌
 تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به‌گایی‌هات برای ایران 🤡
 
 🎯 <b>شوبول</b> و <b>نازسرین</b> جمع کن تا بتونی کصخل بهتری باشی
@@ -126,15 +128,14 @@ def _format_remaining(seconds: int) -> str:
 
 
 def _gender_keyboard():
-    """دکمه‌های جنسیت (هم برای استارت، هم برای گروه)."""
     keyboard = [
         [
-            InlineKeyboardButton("👧 دخترم، جنبه ندارم", callback_data="g_girl_no"),
             InlineKeyboardButton("👧 دخترم، جنبه دارم", callback_data="g_girl_yes"),
+            InlineKeyboardButton("👧 دخترم، جنبه ندارم", callback_data="g_girl_no"),
         ],
         [
-            InlineKeyboardButton("👦 پسرم، جنبه ندارم", callback_data="g_boy_no"),
             InlineKeyboardButton("👦 پسرم، جنبه دارم", callback_data="g_boy_yes"),
+            InlineKeyboardButton("👦 پسرم، جنبه ندارم", callback_data="g_boy_no"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -192,19 +193,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_name=user.last_name or "",
         username=user.username or "",
     )
+    context.user_data.pop("asked_in_group", None)
     context.user_data.pop("self_bot_times", None)
-
-    # چک کن قبلاً جنسیت ثبت کرده یا نه
-    info = get_user_info(user.id)
-    if info and info.get("gender"):
-        # قبلاً ثبت کرده — فقط پیام خوش‌آمد
-        await update.message.reply_text(
-            f"✅ قبلاً ثبت کردی!\n\n"
-            f"⚧ جنسیت: <b>{info['gender']}</b>\n"
-            f"🎭 جنبه: <b>{info['jense'] or 'ندارم'}</b>",
-            parse_mode="HTML",
-        )
-        return
 
     await update.message.reply_text(
         GENDER_QUESTION,
@@ -221,61 +211,46 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # ذخیره‌ی اطلاعات کاربر (اگه جدید باشه)
     save_user(
-        user_id=query.from_user.id,
+        user_id=user_id,
         first_name=query.from_user.first_name or "",
         last_name=query.from_user.last_name or "",
         username=query.from_user.username or "",
     )
 
-    # «دخترم، جنبه ندارم»
-    if data == "g_girl_no":
-        ok = save_gender_info(user_id, "دختر", "ندارم")
-        if ok:
-            await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
-        else:
-            await query.edit_message_text(
-                "⚠️ <b>قبلاً انتخاب کردی!</b>\n"
-                "❌ نمی‌تونی دوباره عوض کنی.",
-                parse_mode="HTML",
-            )
-
-    # «دخترم، جنبه دارم»
-    elif data == "g_girl_yes":
+    # «دخترم، جنبه دارم» → دختر با جنبه
+    if data == "g_girl_yes":
         ok = save_gender_info(user_id, "دختر", "دارم")
         if ok:
             await query.edit_message_text(WELCOME_GIRL_YES, parse_mode="HTML")
         else:
-            await query.edit_message_text(
-                "⚠️ <b>قبلاً انتخاب کردی!</b>\n"
-                "❌ نمی‌تونی دوباره عوض کنی.",
-                parse_mode="HTML",
-            )
+            await query.edit_message_text("❌ اول /start بزن.")
 
-    # «پسرم، جنبه ندارم»
-    elif data == "g_boy_no":
-        ok = save_gender_info(user_id, "پسر", "ندارم")
+    # «دخترم، جنبه ندارم» → دختر بی‌جنبه
+    elif data == "g_girl_no":
+        ok = save_gender_info(user_id, "دختر", "ندارم")
         if ok:
-            await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
+            await query.edit_message_text(WELCOME_GIRL_NO, parse_mode="HTML")
         else:
-            await query.edit_message_text(
-                "⚠️ <b>قبلاً انتخاب کردی!</b>\n"
-                "❌ نمی‌تونی دوباره عوض کنی.",
-                parse_mode="HTML",
-            )
+            await query.edit_message_text("❌ اول /start بزن.")
 
-    # «پسرم، جنبه دارم»
+    # «پسرم، جنبه دارم» → پسر با جنبه
     elif data == "g_boy_yes":
         ok = save_gender_info(user_id, "پسر", "دارم")
         if ok:
             await query.edit_message_text(WELCOME_BOY_YES, parse_mode="HTML")
         else:
-            await query.edit_message_text(
-                "⚠️ <b>قبلاً انتخاب کردی!</b>\n"
-                "❌ نمی‌تونی دوباره عوض کنی.",
-                parse_mode="HTML",
-            )
+            await query.edit_message_text("❌ اول /start بزن.")
+
+    # «پسرم، جنبه ندارم» → پسر بی‌جنبه
+    elif data == "g_boy_no":
+        ok = save_gender_info(user_id, "پسر", "ندارم")
+        if ok:
+            await query.edit_message_text(WELCOME_BOY_NO, parse_mode="HTML")
+        else:
+            await query.edit_message_text("❌ اول /start بزن.")
+
+    context.user_data.pop("asked_in_group", None)
 
 
 # ---------- 🎉 خوش‌آمد گروه ----------
@@ -299,7 +274,7 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطا در ارسال پیام خوش‌آمد: {e}")
 
 
-# ---------- ✅ هندلر شومبول (فقط پسر با جنبه) ----------
+# ---------- ✅ هندلر شومبول ----------
 async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -313,30 +288,45 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cleaned != "شومبول":
         return
 
-    # اگه کاربر ثبت‌نام نکرده → دکمه‌های جنسیت
-    info = get_user_info(user_id)
-    if not info or not info.get("gender"):
-        save_user(
-            user_id=user.id,
-            first_name=user.first_name or "",
-            last_name=user.last_name or "",
-            username=user.username or "",
-        )
-        await update.message.reply_text(
-            "🎭 <b>اول جنسیتت رو انتخاب کن!</b>\n\n"
-            "⚠️ <b>فقط یه بار</b> می‌تونی انتخاب کنی!",
-            parse_mode="HTML",
-            reply_markup=_gender_keyboard(),
-        )
-        return
+    save_user(
+        user_id=user.id,
+        first_name=user.first_name or "",
+        last_name=user.last_name or "",
+        username=user.username or "",
+    )
+
+    if not has_gender(user_id):
+        if update.effective_chat.type in ("group", "supergroup"):
+            if context.user_data.get("asked_in_group"):
+                return
+            context.user_data["asked_in_group"] = True
+
+            await update.message.reply_text(
+                f"🎭 <b>{html.escape(user.first_name or 'دوست')} جان، جنسیتت چیه؟</b>\n\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"💡 برای استفاده از ربات، اول جنسیتت رو انتخاب کن:",
+                parse_mode="HTML",
+                reply_markup=_gender_keyboard(),
+            )
+            return
+        else:
+            await update.message.reply_text(
+                GENDER_QUESTION,
+                parse_mode="HTML",
+                reply_markup=_gender_keyboard(),
+            )
+            return
 
     if await _check_self_bot(update, context):
+        return
+
+    info = get_user_info(user_id)
+    if not info:
         return
 
     gender = info.get("gender")
     jense = info.get("jense")
 
-    # فقط پسر با جنبه
     if not (gender == "پسر" and jense == "دارم"):
         if gender == "دختر":
             await update.message.reply_text(
@@ -385,7 +375,7 @@ async def shombool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------- ✅ هندلر چوچول (فقط دختر با جنبه) ----------
+# ---------- ✅ هندلر چوچول ----------
 async def chochol_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -399,30 +389,45 @@ async def chochol_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cleaned != "چوچول":
         return
 
-    # اگه کاربر ثبت‌نام نکرده → دکمه‌های جنسیت
-    info = get_user_info(user_id)
-    if not info or not info.get("gender"):
-        save_user(
-            user_id=user.id,
-            first_name=user.first_name or "",
-            last_name=user.last_name or "",
-            username=user.username or "",
-        )
-        await update.message.reply_text(
-            "🎭 <b>اول جنسیتت رو انتخاب کن!</b>\n\n"
-            "⚠️ <b>فقط یه بار</b> می‌تونی انتخاب کنی!",
-            parse_mode="HTML",
-            reply_markup=_gender_keyboard(),
-        )
-        return
+    save_user(
+        user_id=user.id,
+        first_name=user.first_name or "",
+        last_name=user.last_name or "",
+        username=user.username or "",
+    )
+
+    if not has_gender(user_id):
+        if update.effective_chat.type in ("group", "supergroup"):
+            if context.user_data.get("asked_in_group"):
+                return
+            context.user_data["asked_in_group"] = True
+
+            await update.message.reply_text(
+                f"🎭 <b>{html.escape(user.first_name or 'دوست')} جان، جنسیتت چیه؟</b>\n\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"💡 برای استفاده از ربات، اول جنسیتت رو انتخاب کن:",
+                parse_mode="HTML",
+                reply_markup=_gender_keyboard(),
+            )
+            return
+        else:
+            await update.message.reply_text(
+                GENDER_QUESTION,
+                parse_mode="HTML",
+                reply_markup=_gender_keyboard(),
+            )
+            return
 
     if await _check_self_bot(update, context):
+        return
+
+    info = get_user_info(user_id)
+    if not info:
         return
 
     gender = info.get("gender")
     jense = info.get("jense")
 
-    # فقط دختر با جنبه
     if not (gender == "دختر" and jense == "دارم"):
         if gender == "پسر":
             await update.message.reply_text(
