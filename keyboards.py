@@ -13,10 +13,30 @@ def join_keyboard() -> InlineKeyboardMarkup:
 
 
 def gender_keyboard() -> InlineKeyboardMarkup:
-    """دکمههای انتخاب جنسیت"""
+    """دکمههای انتخاب جنسیت + جنبه (۴ دکمه)"""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👦 پسر", callback_data="gender_male"),
-            InlineKeyboardButton("👧 دختر", callback_data="gender_female"),
-        ]
+            InlineKeyboardButton(
+                "💁‍♀ دخترم جنبه دارم",
+                callback_data="gender_female_have",
+                api_kwargs={"style": "success"},  # 🟢 سبز
+            ),
+            InlineKeyboardButton(
+                "🙅‍♀ دخترم جنبه ندارم",
+                callback_data="gender_female_dont",
+                api_kwargs={"style": "danger"},  # 🔴 قرمز
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🙋‍♂ پسرم جنبه دارم",
+                callback_data="gender_male_have",
+                api_kwargs={"style": "success"},  # 🟢 سبز
+            ),
+            InlineKeyboardButton(
+                "🙆‍♂ پسرم جنبه ندارم",
+                callback_data="gender_male_dont",
+                api_kwargs={"style": "danger"},  # 🔴 قرمز
+            ),
+        ],
     ])
