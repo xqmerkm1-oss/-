@@ -66,14 +66,7 @@ def save_user(user_id, first_name, last_name, username):
 
 
 def save_gender_info(user_id, gender, jense):
-    """
-    ثبت جنسیت. اگه کاربر قبلاً ثبت کرده باشه، False برمی‌گردونه.
-    """
     with _connect() as conn:
-        cursor = conn.execute("SELECT gender FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if row and row[0]:
-            return False  # قبلاً ثبت کرده
         cursor = conn.execute(
             "UPDATE users SET gender = ?, jense = ? WHERE user_id = ?",
             (gender, jense, user_id)
@@ -95,6 +88,16 @@ def get_user_info(user_id):
         "username": row[3], "gender": row[4], "jense": row[5],
         "created_at": row[6], "last_seen": row[7],
     }
+
+
+def has_gender(user_id):
+    with _connect() as conn:
+        cursor = conn.execute(
+            "SELECT gender, jense FROM users WHERE user_id = ?",
+            (user_id,)
+        )
+        row = cursor.fetchone()
+    return bool(row and row[0] and row[1])
 
 
 # ---------- ارزها ----------
