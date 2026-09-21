@@ -9,7 +9,7 @@ from config import BOT_TOKEN
 from database import init_db
 from handlers import start, check_join, gender_choice, stats
 
-# ===== لاگ برای دیباگ =====
+# ===== لاگ =====
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
