@@ -1,5 +1,25 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from config import CHANNEL_LINK
+from config import CHANNEL_LINK, ADD_TO_GROUP_LINK
+
+
+def start_keyboard() -> InlineKeyboardMarkup:
+    """دکمه‌های پیام خوشامد (کانال + افزودن به گروه)"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "📢 کانال کصخل خیز",
+                url=CHANNEL_LINK,
+                api_kwargs={"style": "primary"},  # 🔵 آبی
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "➕ افزودن ربات به گروه",
+                url=ADD_TO_GROUP_LINK,
+                api_kwargs={"style": "success"},  # 🟢 سبز
+            ),
+        ],
+    ])
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
