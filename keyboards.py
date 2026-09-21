@@ -19,24 +19,24 @@ def gender_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 "💁‍♀ دخترم جنبه دارم",
                 callback_data="gender_female_have",
-                style="success",  # 🟢 سبز
+                api_kwargs={"style": "success"},  # 🟢 سبز
             ),
             InlineKeyboardButton(
                 "🙅‍♀ دخترم جنبه ندارم",
                 callback_data="gender_female_dont",
-                style="danger",  # 🔴 قرمز
+                api_kwargs={"style": "danger"},  # 🔴 قرمز
             ),
         ],
         [
             InlineKeyboardButton(
                 "🙋‍♂ پسرم جنبه دارم",
                 callback_data="gender_male_have",
-                style="success",  # 🟢 سبز
+                api_kwargs={"style": "success"},  # 🟢 سبز
             ),
             InlineKeyboardButton(
                 "🙆‍♂ پسرم جنبه ندارم",
                 callback_data="gender_male_dont",
-                style="danger",  # 🔴 قرمز
+                api_kwargs={"style": "danger"},  # 🔴 قرمز
             ),
         ],
     ])
