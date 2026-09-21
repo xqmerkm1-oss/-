@@ -1,4 +1,5 @@
 import time
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
@@ -282,18 +283,60 @@ HELP_FEMALE_DONT_TEXT = (
 
 
 # ===== سشن راهنما (برای قفل دکمه‌ها) =====
-_help_sessions = {}  # {user_id: timestamp}
+# {user_id: (timestamp, chat_id, message_id)}
+_help_sessions = {}
 
 
 def _is_help_valid(user_id: int) -> bool:
-    ts = _help_sessions.get(user_id)
-    if not ts:
+    entry = _help_sessions.get(user_id)
+    if not entry:
         return False
+    ts = entry[0]
     return (time.time() - ts) < HELP_EXPIRE_SECONDS
 
 
-def _create_help_session(user_id: int):
-    _help_sessions[user_id] = time.time()
+def _create_help_session(user_id: int, chat_id: int, message_id: int):
+    """ساخت سشن راهنما با اطلاعات پیام (برای بستن خودکار)"""
+    _help_sessions[user_id] = (time.time(), chat_id, message_id)
+
+
+def _update_help_activity(user_id: int):
+    """هر بار کلیک روی دکمه، تایمر رو ریست میکنه"""
+    entry = _help_sessions.get(user_id)
+    if entry:
+        _, chat_id, message_id = entry
+        _help_sessions[user_id] = (time.time(), chat_id, message_id)
+
+
+async def auto_close_help_panel(context: ContextTypes.DEFAULT_TYPE):
+    """
+    هر ۳۰ ثانیه چک میکنه کدوم پنل‌های راهنما منقضی شدن
+    و اونا رو می‌بنده
+    """
+    now = time.time()
+    expired_users = []
+
+    for user_id, (ts, chat_id, message_id) in list(_help_sessions.items()):
+        if (now - ts) >= HELP_EXPIRE_SECONDS:
+            expired_users.append((user_id, chat_id, message_id))
+
+    for user_id, chat_id, message_id in expired_users:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=(
+                    "⏰ <b>پنل بسته شد</b>\n\n"
+                    "به دلیل <b>استفاده نکردن</b>، پنل راهنما بسته شد.\n\n"
+                    "اگه میخوای دوباره بازش کنی، بنویس <b>راهنما</b>."
+                ),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            print(f"[auto_close_help_panel error] {e}")
+
+        # حذف از سشن
+        _help_sessions.pop(user_id, None)
 
 
 # ===== توابع کمکی =====
@@ -533,17 +576,21 @@ async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     gender = db_user["gender"]
 
-    # ساخت سشن راهنما
-    _create_help_session(user.id)
-
     # ارسال راهنمای کوتاه مخصوص جنسیت
     text = SHORT_HELP.get(gender, SHORT_HELP["male_have"])
     keyboard = help_keyboard(user.id, gender)
 
-    await message.reply_text(
+    sent_message = await message.reply_text(
         text,
         reply_markup=keyboard,
         parse_mode="HTML",
+    )
+
+    # ساخت سشن راهنما با اطلاعات پیام
+    _create_help_session(
+        user_id=user.id,
+        chat_id=sent_message.chat_id,
+        message_id=sent_message.message_id,
     )
 
 
@@ -582,6 +629,9 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             show_alert=True,
         )
         return
+
+    # ===== هر کلیک، تایمر رو ریست میکنه =====
+    _update_help_activity(owner_id)
 
     # ===== تشخیص نوع درخواست =====
     if "long" in data:
