@@ -41,3 +41,56 @@ TOP_THRESHOLD = 200000
 
 # ===== زمان انقضای راهنما (ثانیه) =====
 HELP_EXPIRE_SECONDS = 300     # ۵ دقیقه
+
+# ===== رتبه‌ها =====
+# (حداقل پوینت، لقب)
+MALE_RANKS = [
+    (1500000, "👑 شومبول برتر"),
+    (800000,  "🥇 کیر طلای"),
+    (300000,  "🍆 مینی کیر"),
+    (100000,  "🍌 شومبول"),
+    (0,       "🆕 تازه‌وارد"),
+]
+
+FEMALE_RANKS = [
+    (1500000, "👑 چوچول برتر"),
+    (800000,  "🤍 سیفید"),
+    (300000,  "🌸 چوچول"),
+    (100000,  "🍑 مینی کص"),
+    (0,       "🆕 تازه‌وارد"),
+]
+
+
+def get_rank(points: int, gender: str) -> str:
+    """گرفتن لقب بر اساس پوینت و جنسیت"""
+    if gender == "male_have":
+        ranks = MALE_RANKS
+    elif gender == "female_have":
+        ranks = FEMALE_RANKS
+    else:
+        return "🆕 تازه‌وارد"
+
+    for min_points, title in ranks:
+        if points >= min_points:
+            return title
+
+    return "🆕 تازه‌وارد"
+
+
+def get_next_rank(points: int, gender: str):
+    """
+    گرفتن رتبه بعدی و پوینت لازم
+    Returns: (next_title, points_needed) یا (None, 0)
+    """
+    if gender == "male_have":
+        ranks = sorted(MALE_RANKS, key=lambda x: x[0])
+    elif gender == "female_have":
+        ranks = sorted(FEMALE_RANKS, key=lambda x: x[0])
+    else:
+        return None, 0
+
+    for min_points, title in ranks:
+        if points < min_points:
+            return title, min_points - points
+
+    return None, 0
