@@ -9,7 +9,7 @@ from handlers import start, check_join, gender_choice, stats
 
 
 def main():
-    # ساخت جدولهای دیتابیس
+    # ساخت جدول‌های دیتابیس
     init_db()
 
     app = Application.builder().token(BOT_TOKEN).build()
