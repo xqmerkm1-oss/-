@@ -138,12 +138,12 @@ TOP_NOT_ALLOWED = (
 # راهنمای شخصی‌سازی‌شده
 # ============================================================
 
-# ===== متن راهنمای کوتاه (شخصی) =====
 SHORT_HELP = {
     "male_have": (
         "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
         "👋 خب پس تو <b>پسر با جنبه</b> هستی!\n\n"
         "🍌 توی گروه بنویس <b>کیر</b> → <b>۵ کیر پوینت</b> بگیر\n\n"
+        "📊 برای دیدن پوینتت بنویس <b>کیرام</b>\n\n"
         "⏳ هر ۳ دقیقه یه بار\n\n"
         "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
     ),
@@ -151,6 +151,7 @@ SHORT_HELP = {
         "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
         "👋 خب پس تو <b>دختر با جنبه</b> هستی!\n\n"
         "🍑 توی گروه بنویس <b>کص</b> → <b>۵ کص پوینت</b> بگیر\n\n"
+        "📊 برای دیدن پوینتت بنویس <b>کصام</b>\n\n"
         "⏳ هر ۳ دقیقه یه بار\n\n"
         "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
     ),
@@ -158,6 +159,7 @@ SHORT_HELP = {
         "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
         "👋 خب پس تو <b>پسر بی‌جنبه</b> هستی!\n\n"
         "🌹 توی گروه بنویس <b>پسر خوب</b> → <b>۱ پوینت</b> بگیر\n\n"
+        "📊 برای دیدن پوینتت بنویس <b>پوینتام</b>\n\n"
         "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری\n\n"
         "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
     ),
@@ -165,13 +167,13 @@ SHORT_HELP = {
         "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
         "👋 خب پس تو <b>دختر بی‌جنبه</b> هستی!\n\n"
         "🌸 توی گروه بنویس <b>دختر خوب</b> → <b>۱ پوینت</b> بگیر\n\n"
+        "📊 برای دیدن پوینتت بنویس <b>پوینتام</b>\n\n"
         "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری\n\n"
         "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
     ),
 }
 
 
-# ===== متن توضیحات بلند =====
 LONG_HELP_TEXT = (
     "📖 <b>راهنمای کصخل خیز — توضیحات بلند</b> 📖\n"
     "━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -221,6 +223,12 @@ LONG_HELP_TEXT = (
     "🍰 <b>بالای ۲۰۰۰۰۰</b> → <b>کیک</b> → ۱ پوینت\n\n"
 
     "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "📊 <b>دستورات نمایش پوینت:</b>\n\n"
+    "🍌 پسر با جنبه → <b>کیرام</b> یا <b>کیرهام</b>\n"
+    "🍑 دختر با جنبه → <b>کصام</b> یا <b>کصهام</b>\n"
+    "💰 همه → <b>پوینتام</b> یا <b>پوینتهام</b>\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
     "⏳ <b>محدودیت زمانی:</b>\n"
     "هر <b>۳ دقیقه</b> یه بار.\n\n"
 
@@ -238,7 +246,6 @@ LONG_HELP_TEXT = (
 )
 
 
-# ===== متن‌های اختصاصی هر بخش =====
 HELP_KIR_TEXT = (
     "🍌 <b>کیر پوینت</b> 🍌\n\n"
     "👦 فقط <b>پسرای با جنبه</b> می‌تونن بگیرن.\n\n"
@@ -247,7 +254,9 @@ HELP_KIR_TEXT = (
     "💰 <b>چقدر میده؟</b>\n"
     "<b>۵ کیر پوینت</b> هر بار.\n\n"
     "⏳ <b>هر چند وقت؟</b>\n"
-    "هر <b>۳ دقیقه</b> یه بار."
+    "هر <b>۳ دقیقه</b> یه بار.\n\n"
+    "📊 <b>دیدن پوینتت:</b>\n"
+    "بنویس <b>کیرام</b> یا <b>کیرهام</b>"
 )
 
 HELP_KOS_TEXT = (
@@ -258,7 +267,9 @@ HELP_KOS_TEXT = (
     "💰 <b>چقدر میده؟</b>\n"
     "<b>۵ کص پوینت</b> هر بار.\n\n"
     "⏳ <b>هر چند وقت؟</b>\n"
-    "هر <b>۳ دقیقه</b> یه بار."
+    "هر <b>۳ دقیقه</b> یه بار.\n\n"
+    "📊 <b>دیدن پوینتت:</b>\n"
+    "بنویس <b>کصام</b> یا <b>کصهام</b>"
 )
 
 HELP_MALE_DONT_TEXT = (
@@ -268,6 +279,8 @@ HELP_MALE_DONT_TEXT = (
     "توی گروه بنویس <b>پسر خوب</b>.\n\n"
     "💰 <b>چقدر میده؟</b>\n"
     "فقط <b>۱ پوینت</b> هر بار.\n\n"
+    "📊 <b>دیدن پوینتت:</b>\n"
+    "بنویس <b>پوینتام</b>\n\n"
     "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری!"
 )
 
@@ -278,11 +291,13 @@ HELP_FEMALE_DONT_TEXT = (
     "توی گروه بنویس <b>دختر خوب</b>.\n\n"
     "💰 <b>چقدر میده؟</b>\n"
     "فقط <b>۱ پوینت</b> هر بار.\n\n"
+    "📊 <b>دیدن پوینتت:</b>\n"
+    "بنویس <b>پوینتام</b>\n\n"
     "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری!"
 )
 
 
-# ===== سشن راهنما (برای قفل دکمه‌ها) =====
+# ===== سشن راهنما =====
 # {user_id: (timestamp, chat_id, message_id)}
 _help_sessions = {}
 
@@ -296,12 +311,10 @@ def _is_help_valid(user_id: int) -> bool:
 
 
 def _create_help_session(user_id: int, chat_id: int, message_id: int):
-    """ساخت سشن راهنما با اطلاعات پیام (برای بستن خودکار)"""
     _help_sessions[user_id] = (time.time(), chat_id, message_id)
 
 
 def _update_help_activity(user_id: int):
-    """هر بار کلیک روی دکمه، تایمر رو ریست میکنه"""
     entry = _help_sessions.get(user_id)
     if entry:
         _, chat_id, message_id = entry
@@ -309,10 +322,7 @@ def _update_help_activity(user_id: int):
 
 
 async def auto_close_help_panel(context: ContextTypes.DEFAULT_TYPE):
-    """
-    هر ۳۰ ثانیه چک میکنه کدوم پنل‌های راهنما منقضی شدن
-    و اونا رو می‌بنده
-    """
+    """هر ۳۰ ثانیه چک میکنه کدوم پنل‌های راهنما منقضی شدن"""
     now = time.time()
     expired_users = []
 
@@ -335,7 +345,6 @@ async def auto_close_help_panel(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"[auto_close_help_panel error] {e}")
 
-        # حذف از سشن
         _help_sessions.pop(user_id, None)
 
 
@@ -540,6 +549,81 @@ async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def my_points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستورات کیرام / کصام / پوینتام — نمایش پوینت‌ها"""
+    message = update.message
+    if not message or not message.text:
+        return
+
+    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+
+    text = message.text.strip()
+
+    # ===== چک کلمه‌های فارسی =====
+    is_kir_command = text in ("کیرام", "کیرهام", "کیر هام", "کیرها")
+    is_kos_command = text in ("کصام", "کصهام", "کص هام", "کصها")
+    is_point_command = text in ("پوینتام", "پوینتهام", "پوینت هام", "پوینتها")
+
+    if not (is_kir_command or is_kos_command or is_point_command):
+        return
+
+    db_user = get_user(user.id)
+
+    # اگه استارت نزده
+    if not db_user or not db_user.get("gender"):
+        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
+        return
+
+    gender = db_user["gender"]
+    info = get_points(user.id)
+    total = info["points"] if info else 0
+
+    # ===== تعیین اسم پوینت بر اساس جنسیت =====
+    if gender == "male_have":
+        point_name = "کیر پوینت"
+        emoji = "🍌"
+    elif gender == "female_have":
+        point_name = "کص پوینت"
+        emoji = "🍑"
+    elif gender == "male_dont":
+        point_name = "پسر خوب پوینت"
+        emoji = "🌹"
+    elif gender == "female_dont":
+        point_name = "دختر خوب پوینت"
+        emoji = "🌸"
+    else:
+        point_name = "پوینت"
+        emoji = "💰"
+
+    # ===== چک دسترسی =====
+    if is_kir_command and gender != "male_have":
+        await message.reply_text(
+            "🚫 <b>این دستور مخصوص پسرای با جنبه‌ست!</b>\n\n"
+            "اگه می‌خوای پوینتت رو ببینی، بنویس <b>پوینتام</b>.",
+            parse_mode="HTML",
+        )
+        return
+
+    if is_kos_command and gender != "female_have":
+        await message.reply_text(
+            "🚫 <b>این دستور مخصوص دخترای با جنبه‌ست!</b>\n\n"
+            "اگه می‌خوای پوینتت رو ببینی، بنویس <b>پوینتام</b>.",
+            parse_mode="HTML",
+        )
+        return
+
+    # ===== ارسال پوینت =====
+    await message.reply_text(
+        f"{emoji} <b>{point_name} هات :</b> {total} {emoji}",
+        parse_mode="HTML",
+    )
+
+
 # ===== هندلرهای گروه =====
 
 async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -569,14 +653,12 @@ async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = message.from_user
     db_user = get_user(user.id)
 
-    # اگه استارت نزده
     if not db_user or not db_user.get("gender"):
         await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
 
     gender = db_user["gender"]
 
-    # ارسال راهنمای کوتاه مخصوص جنسیت
     text = SHORT_HELP.get(gender, SHORT_HELP["male_have"])
     keyboard = help_keyboard(user.id, gender)
 
@@ -586,7 +668,6 @@ async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML",
     )
 
-    # ساخت سشن راهنما با اطلاعات پیام
     _create_help_session(
         user_id=user.id,
         chat_id=sent_message.chat_id,
@@ -600,13 +681,11 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     clicker_id = query.from_user.id
 
-    # ===== چک امنیت: فقط صاحب راهنما =====
     parts = data.split("_")
     if len(parts) < 3:
         await query.answer()
         return
 
-    # آخرین بخش = user_id صاحب راهنما
     try:
         owner_id = int(parts[-1])
     except ValueError:
@@ -621,7 +700,6 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ===== چک انقضای سشن =====
     if not _is_help_valid(owner_id):
         await query.answer(
             "⏰ این راهنما منقضی شده!\n"
@@ -630,10 +708,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ===== هر کلیک، تایمر رو ریست میکنه =====
     _update_help_activity(owner_id)
 
-    # ===== تشخیص نوع درخواست =====
     if "long" in data:
         db_user = get_user(owner_id)
         gender = db_user["gender"] if db_user else "male_have"
@@ -735,10 +811,8 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user or user.is_bot:
         return
 
-    # ===== پاک کردن فاصله‌های اضافی و مقایسه دقیق =====
     text = message.text.strip()
 
-    # ===== چک می‌کنیم که متن دقیقاً یکی از کلمات باشه =====
     exact_match = None
 
     if text == KIR_WORD:
@@ -754,7 +828,6 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == TOP_WORD:
         exact_match = TOP_WORD
 
-    # اگه دقیقاً کلمه نبود، هیچی نکن
     if not exact_match:
         return
 
@@ -830,7 +903,6 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         emoji = "🍰"
         point_name = "کیک پوینت"
 
-    # ===== چک کول‌داون =====
     can, remaining = can_claim(user.id, KIR_POINT_COOLDOWN)
 
     if not can:
