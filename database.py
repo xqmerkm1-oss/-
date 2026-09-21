@@ -1,11 +1,10 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import DATABASE_PATH
 
 
 def get_connection():
-    """اتصال به دیتابیس با ساخت پوشه در صورت نبود"""
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
@@ -13,7 +12,6 @@ def get_connection():
 
 
 def init_db():
-    """ساخت جدول‌ها"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -40,12 +38,22 @@ def init_db():
         )
     """)
 
+    # ===== جدول کیر پوینت =====
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS kir_points (
+            user_id        INTEGER PRIMARY KEY,
+            points         INTEGER DEFAULT 0,
+            last_claimed   TEXT,
+            total_claimed  INTEGER DEFAULT 0,
+            updated_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
 
 
 def get_user(user_id: int):
-    """گرفتن اطلاعات یک کاربر"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -56,7 +64,6 @@ def get_user(user_id: int):
 
 def create_or_update_user(user_id: int, username: str = None,
                           first_name: str = None, last_name: str = None):
-    """ساخت یا آپدیت کاربر"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -73,7 +80,6 @@ def create_or_update_user(user_id: int, username: str = None,
 
 
 def set_user_joined(user_id: int, joined: bool):
-    """ثبت وضعیت عضویت کاربر"""
     conn = get_connection()
     cursor = conn.cursor()
     now = datetime.now().isoformat() if joined else None
@@ -88,7 +94,6 @@ def set_user_joined(user_id: int, joined: bool):
 
 
 def set_user_gender(user_id: int, gender: str):
-    """ثبت جنسیت کاربر"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -101,7 +106,6 @@ def set_user_gender(user_id: int, gender: str):
 
 
 def log_join_action(user_id: int, action: str):
-    """لاگ کردن اکشن عضویت"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -113,7 +117,6 @@ def log_join_action(user_id: int, action: str):
 
 
 def get_stats():
-    """آمار کلی ربات"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) AS total FROM users")
@@ -135,3 +138,59 @@ def get_stats():
         "males": males,
         "females": females,
     }
+
+
+# ===== کیر پوینت =====
+
+def get_kir_points(user_id: int):
+    """گرفتن اطلاعات کیر پوینت کاربر"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM kir_points WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_kir_points(user_id: int, amount: int) -> int:
+    """اضافه کردن امتیاز و برگردوندن مجموع جدید"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now().isoformat()
+
+    # ساخت رکورد اگه وجود نداره
+    cursor.execute("""
+        INSERT INTO kir_points (user_id, points, last_claimed, total_claimed)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            points        = kir_points.points + excluded.points,
+            total_claimed = kir_points.total_claimed + excluded.total_claimed,
+            last_claimed  = excluded.last_claimed,
+            updated_at    = CURRENT_TIMESTAMP
+    """, (user_id, amount, now, amount))
+
+    conn.commit()
+
+    cursor.execute("SELECT points FROM kir_points WHERE user_id = ?", (user_id,))
+    new_total = cursor.fetchone()["points"]
+    conn.close()
+    return new_total
+
+
+def can_claim_kir(user_id: int, cooldown_seconds: int):
+    """
+    چک میکنه کاربر میتونه امتیاز بگیره یا نه
+    Returns: (can_claim: bool, remaining_seconds: int)
+    """
+    info = get_kir_points(user_id)
+
+    if not info or not info.get("last_claimed"):
+        return True, 0
+
+    last = datetime.fromisoformat(info["last_claimed"])
+    elapsed = (datetime.now() - last).total_seconds()
+
+    if elapsed >= cooldown_seconds:
+        return True, 0
+
+    return False, int(cooldown_seconds - elapsed)
