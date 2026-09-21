@@ -44,7 +44,6 @@ def init_db():
         )
     """)
 
-    # ===== جدول امتیازها (یکپارچه برای همه) =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS points (
             user_id        BIGINT PRIMARY KEY,
@@ -152,8 +151,6 @@ def get_stats():
         "females": females,
     }
 
-
-# ===== امتیازها (یکپارچه) =====
 
 def get_points(user_id: int):
     conn = get_connection()
