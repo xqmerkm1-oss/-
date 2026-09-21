@@ -3,7 +3,7 @@ from config import CHANNEL_LINK
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های عضویت در کانال + تایید"""
+    """دکمههای عضویت در کانال + تایید"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📢 کانال کصخل خیز", url=CHANNEL_LINK),
