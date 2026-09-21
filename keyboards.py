@@ -3,7 +3,7 @@ from config import CHANNEL_LINK
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    """دکمههای عضویت در کانال + تایید"""
+    """دکمه‌های عضویت در کانال + تایید"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📢 کانال کصخل خیز", url=CHANNEL_LINK),
@@ -13,30 +13,30 @@ def join_keyboard() -> InlineKeyboardMarkup:
 
 
 def gender_keyboard() -> InlineKeyboardMarkup:
-    """دکمههای انتخاب جنسیت + جنبه (۴ دکمه)"""
+    """۴ دکمه انتخاب جنسیت + جنبه (سبز/قرمز)"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
                 "💁‍♀ دخترم جنبه دارم",
                 callback_data="gender_female_have",
-                api_kwargs={"style": "success"},  # 🟢 سبز
+                style="success",  # 🟢 سبز
             ),
             InlineKeyboardButton(
                 "🙅‍♀ دخترم جنبه ندارم",
                 callback_data="gender_female_dont",
-                api_kwargs={"style": "danger"},  # 🔴 قرمز
+                style="danger",  # 🔴 قرمز
             ),
         ],
         [
             InlineKeyboardButton(
                 "🙋‍♂ پسرم جنبه دارم",
                 callback_data="gender_male_have",
-                api_kwargs={"style": "success"},  # 🟢 سبز
+                style="success",  # 🟢 سبز
             ),
             InlineKeyboardButton(
                 "🙆‍♂ پسرم جنبه ندارم",
                 callback_data="gender_male_dont",
-                api_kwargs={"style": "danger"},  # 🔴 قرمز
+                style="danger",  # 🔴 قرمز
             ),
         ],
     ])
