@@ -9,22 +9,23 @@ from database import (
 from keyboards import join_keyboard, gender_keyboard
 
 
-# ====== متنها ======
+# ===== متن‌ها (بولد + ایموجی) =====
 WELCOME_TEXT = (
-    "به ربات کصخل خیز خوش اومدین برای استفاده از ربات ابتدا باید "
-    "عضو کانال کصخل خیز درجه یک شوید !\n"
-    "لینک کانال\n"
-    "https://t.me/Afirstratescumbag\n"
-    "ایدی عددی کانال\n"
-    f"{CHANNEL_ID}"
+    "🎉 <b>به ربات کصخل خیز خوش اومدین</b> 🎉\n\n"
+    "📌 برای استفاده از ربات ابتدا باید عضو کانال "
+    "<b>کصخل خیز درجه یک</b> شوید !"
 )
 
 NOT_JOINED_TEXT = (
-    "جقی هنوز عضو نشدی داری عضو شدمو میزنی عضو کانال شو ببینم تا نکردمت عه کصکش !"
+    "🚫 <b>جقی هنوز عضو نشدی</b> 🚫\n\n"
+    "داری <b>عضو شدم</b>و میزنی ❓\n"
+    "عضو کانال شو ببینم تا نکردمت عه کصکش <b>جقی بدبخت</b> !"
 )
 
 JOINED_TEXT = (
-    "بلخره عضو شدی آفرین از جقی بودن دراومدی حالا جنسیتت رو از دکمه های زیر انتخاب کن !"
+    "🎊 <b>بلخره عضو شدی آفرین</b> 🎊\n\n"
+    "از <b>جقی بودن</b> دراومدی 😎\n"
+    "حالا <b>جنسیتت</b> رو از دکمه های زیر انتخاب کن !"
 )
 
 
@@ -44,7 +45,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start - پیام خوشامد"""
     user = update.effective_user
 
-    # ذخیره کاربر در دیتابیس
     create_or_update_user(
         user_id=user.id,
         username=user.username,
@@ -58,21 +58,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if joined:
         db_user = get_user(user.id)
-        # اگه قبلاً جنسیت انتخاب کرده
         if db_user and db_user.get("gender"):
+            gender_label = {
+                "female_have": "💁‍♀ دخترم جنبه دارم",
+                "female_dont": "🙅‍♀ دخترم جنبه ندارم",
+                "male_have": "🙋‍♂ پسرم جنبه دارم",
+                "male_dont": "🙆‍♂ پسرم جنبه ندارم",
+            }.get(db_user["gender"], db_user["gender"])
             await update.message.reply_text(
-                f"خوش برگشتی {user.first_name} 👋\n"
-                f"جنسیتت: {'پسر 👦' if db_user['gender'] == 'male' else 'دختر 👧'}"
+                f"👋 <b>خوش برگشتی {user.first_name}</b>\n\n"
+                f"وضعیتت: {gender_label}",
+                parse_mode="HTML",
             )
             return
         await update.message.reply_text(
             JOINED_TEXT,
             reply_markup=gender_keyboard(),
+            parse_mode="HTML",
         )
     else:
         await update.message.reply_text(
             WELCOME_TEXT,
             reply_markup=join_keyboard(),
+            parse_mode="HTML",
         )
 
 
@@ -90,13 +98,15 @@ async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(
                 NOT_JOINED_TEXT,
                 reply_markup=join_keyboard(),
+                parse_mode="HTML",
             )
         except Exception:
             await query.message.reply_text(
                 NOT_JOINED_TEXT,
                 reply_markup=join_keyboard(),
+                parse_mode="HTML",
             )
-        await query.answer("هنوز عضو نشدی!", show_alert=True)
+        await query.answer("🚫 هنوز عضو نشدی!", show_alert=True)
         return
 
     # عضو شده → پیام قبلی رو پاک کن
@@ -109,43 +119,50 @@ async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=query.message.chat_id,
         text=JOINED_TEXT,
         reply_markup=gender_keyboard(),
+        parse_mode="HTML",
     )
-    await query.answer("عضو شدی ✅")
+    await query.answer("✅ عضو شدی")
 
 
 async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """انتخاب جنسیت"""
+    """انتخاب جنسیت + جنبه"""
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data
 
-    if data == "gender_male":
-        gender, label = "male", "پسر 👦"
-    elif data == "gender_female":
-        gender, label = "female", "دختر 👧"
-    else:
+    mapping = {
+        "gender_female_have": ("female_have", "💁‍♀ دخترم جنبه دارم"),
+        "gender_female_dont": ("female_dont", "🙅‍♀ دخترم جنبه ندارم"),
+        "gender_male_have":   ("male_have",   "🙋‍♂ پسرم جنبه دارم"),
+        "gender_male_dont":   ("male_dont",   "🙆‍♂ پسرم جنبه ندارم"),
+    }
+
+    if data not in mapping:
         await query.answer()
         return
 
-    set_user_gender(user_id, gender)
+    gender_value, label = mapping[data]
+    set_user_gender(user_id, gender_value)
 
     try:
         await query.edit_message_text(
-            f"جنسیتت ثبت شد: {label}\nحالا میتونی از ربات استفاده کنی."
+            f"✅ <b>ثبت شد:</b> {label}\n\n"
+            f"حالا میتونی از ربات استفاده کنی 🎉",
+            parse_mode="HTML",
         )
     except Exception:
         pass
-    await query.answer(f"ثبت شد: {label}")
+    await query.answer(f"✅ ثبت شد: {label}")
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/stats - آمار (فقط برای ادمین)"""
+    """/stats - آمار ربات"""
     s = get_stats()
     text = (
-        "📊 آمار ربات\n\n"
-        f"👥 کل کاربران: {s['total']}\n"
-        f"✅ عضو کانال: {s['joined']}\n"
-        f"👦 پسر: {s['males']}\n"
-        f"👧 دختر: {s['females']}"
+        "📊 <b>آمار ربات</b>\n\n"
+        f"👥 کل کاربران: <b>{s['total']}</b>\n"
+        f"✅ عضو کانال: <b>{s['joined']}</b>\n"
+        f"👦 پسر: <b>{s['males']}</b>\n"
+        f"👧 دختر: <b>{s['females']}</b>"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
