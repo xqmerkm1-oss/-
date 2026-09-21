@@ -12,6 +12,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN") or DEFAULT_BOT_TOKEN
 CHANNEL_ID = int(os.getenv("CHANNEL_ID") or DEFAULT_CHANNEL_ID)
 CHANNEL_LINK = os.getenv("CHANNEL_LINK") or DEFAULT_CHANNEL_LINK
 
+# ===== لینک افزودن ربات به گروه =====
+ADD_TO_GROUP_LINK = "https://t.me/Kaskhelkhizbot?startgroup=true"
+
 # ===== دیتابیس Postgres =====
 DATABASE_URL = os.getenv("DATABASE_URL")
 
