@@ -13,6 +13,7 @@ from config import (
     HIGH_WORD, TOP_WORD,
     HIGH_THRESHOLD, TOP_THRESHOLD,
     HELP_EXPIRE_SECONDS,
+    get_rank, get_next_rank,
 )
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
@@ -22,7 +23,7 @@ from database import (
 from keyboards import (
     join_keyboard, gender_keyboard, confirm_keyboard,
     help_keyboard, help_back_keyboard,
-    start_keyboard,
+    joined_keyboard,
 )
 
 
@@ -30,8 +31,7 @@ from keyboards import (
 WELCOME_TEXT = (
     "🎉 <b>به ربات کصخل خیز خوش اومدین</b> 🎉\n\n"
     "📌 برای استفاده از ربات ابتدا باید عضو کانال "
-    "<b>کصخل خیز درجه یک</b> شوید !\n\n"
-    "➕ یا ربات رو به گروهت اضافه کن و حالشو ببر !"
+    "<b>کصخل خیز درجه یک</b> شوید !"
 )
 
 NOT_JOINED_TEXT = (
@@ -83,7 +83,8 @@ FEMALE_DONT_TEXT = (
 
 CONFIRM_TEXT = (
     "✅ <b>حله جنسیتت ثبت شد</b> 🎉\n\n"
-    "حالا می‌تونی از ربات <b>استفاده کنی</b> 😎"
+    "حالا می‌تونی از ربات <b>استفاده کنی</b> 😎\n\n"
+    "➕ ربات رو به گروهت اضافه کن و حالشو ببر !"
 )
 
 CANCEL_TEXT = (
@@ -229,6 +230,21 @@ LONG_HELP_TEXT = (
     "🍌 پسر با جنبه → <b>کیرام</b> یا <b>کیرهام</b>\n"
     "🍑 دختر با جنبه → <b>کصام</b> یا <b>کصهام</b>\n"
     "💰 همه → <b>پوینتام</b> یا <b>پوینتهام</b>\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "🏆 <b>رتبه‌ها:</b>\n\n"
+
+    "👦 <b>پسرها:</b>\n"
+    "🍌 ۱۰۰,۰۰۰ → شومبول\n"
+    "🍆 ۳۰۰,۰۰۰ → مینی کیر\n"
+    "🥇 ۸۰۰,۰۰۰ → کیر طلای\n"
+    "👑 ۱,۵۰۰,۰۰۰ → شومبول برتر\n\n"
+
+    "👧 <b>دخترها:</b>\n"
+    "🍑 ۱۰۰,۰۰۰ → مینی کص\n"
+    "🌸 ۳۰۰,۰۰۰ → چوچول\n"
+    "🤍 ۸۰۰,۰۰۰ → سیفید\n"
+    "👑 ۱,۵۰۰,۰۰۰ → چوچول برتر\n\n"
 
     "━━━━━━━━━━━━━━━━━━━━━━\n"
     "⏳ <b>محدودیت زمانی:</b>\n"
@@ -390,6 +406,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"👋 <b>خوش برگشتی {user.first_name}</b>\n\n"
                 f"وضعیتت: {gender_label}",
+                reply_markup=joined_keyboard(),
                 parse_mode="HTML",
             )
             return
@@ -401,7 +418,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             WELCOME_TEXT,
-            reply_markup=start_keyboard(),
+            reply_markup=join_keyboard(),
             parse_mode="HTML",
         )
 
@@ -498,7 +515,11 @@ async def confirm_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "confirm":
         set_user_gender(user_id, gender_value)
         try:
-            await query.edit_message_text(CONFIRM_TEXT, parse_mode="HTML")
+            await query.edit_message_text(
+                CONFIRM_TEXT,
+                reply_markup=joined_keyboard(),
+                parse_mode="HTML",
+            )
         except Exception:
             pass
         await query.answer("✅ ثبت شد")
@@ -536,23 +557,27 @@ async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
 
+    gender = db_user["gender"]
     info = get_points(user.id)
     total = info["points"] if info else 0
 
-    await update.message.reply_text(
-        f"💰 <b>پوینتت:</b> {total}\n\n"
-        f"🍌 کیر → ۵ کیر پوینت\n"
-        f"🍑 کص → ۵ کص پوینت\n"
-        f"🌹 پسر خوب → ۱ پوینت\n"
-        f"🌸 دختر خوب → ۱ پوینت\n"
-        f"💎 سلام گلم (بالای ۵۰۰۰۰) → ۱ پوینت\n"
-        f"🍰 کیک (بالای ۲۰۰۰۰۰) → ۱ پوینت",
-        parse_mode="HTML",
-    )
+    rank = get_rank(total, gender)
+    next_rank, needed = get_next_rank(total, gender)
+
+    text = f"💰 <b>پوینتت:</b> {total:,}\n\n"
+    text += f"🏆 <b>لقبت:</b> {rank}\n"
+
+    if next_rank and needed > 0:
+        text += f"\n📈 <b>رتبه بعدی:</b> {next_rank}\n"
+        text += f"🎯 <b>پوینت لازم:</b> {needed:,} تا دیگه"
+    else:
+        text += "\n👑 <b>تو به بالاترین رتبه رسیدی!</b>"
+
+    await update.message.reply_text(text, parse_mode="HTML")
 
 
 async def my_points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستورات کیرام / کصام / پوینتام — نمایش پوینت‌ها"""
+    """دستورات کیرام / کصام / پوینتام — نمایش پوینت‌ها + رتبه"""
     message = update.message
     if not message or not message.text:
         return
@@ -615,10 +640,23 @@ async def my_points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await message.reply_text(
-        f"{emoji} <b>{point_name} هات :</b> {total} {emoji}",
-        parse_mode="HTML",
+    rank = get_rank(total, gender)
+    next_rank, needed = get_next_rank(total, gender)
+
+    text_out = (
+        f"{emoji} <b>{point_name} هات :</b> {total:,} {emoji}\n\n"
+        f"🏆 <b>لقبت :</b> {rank}\n"
     )
+
+    if next_rank and needed > 0:
+        text_out += (
+            f"\n📈 <b>رتبه بعدی :</b> {next_rank}\n"
+            f"🎯 <b>پوینت لازم :</b> {needed:,} تا دیگه"
+        )
+    else:
+        text_out += "\n👑 <b>تو به بالاترین رتبه رسیدی!</b>"
+
+    await message.reply_text(text_out, parse_mode="HTML")
 
 
 # ===== هندلرهای گروه =====
@@ -678,6 +716,35 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     clicker_id = query.from_user.id
 
+    # ===== دکمه «راهنما» توی پیام تأیید =====
+    if data == "show_help":
+        db_user = get_user(clicker_id)
+        if not db_user or not db_user.get("gender"):
+            await query.answer("اول /start بزن!", show_alert=True)
+            return
+
+        gender = db_user["gender"]
+        text = SHORT_HELP.get(gender, SHORT_HELP["male_have"])
+        keyboard = help_keyboard(clicker_id, gender)
+
+        try:
+            await query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+        _create_help_session(
+            user_id=clicker_id,
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+        )
+        await query.answer()
+        return
+
+    # ===== بقیه کد =====
     parts = data.split("_")
     if len(parts) < 3:
         await query.answer()
@@ -789,7 +856,10 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "mypoints" in data:
         info = get_points(owner_id)
         total = info["points"] if info else 0
-        await query.answer(f"💰 پوینتت: {total}", show_alert=True)
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "male_have"
+        rank = get_rank(total, gender)
+        await query.answer(f"💰 پوینتت: {total:,}\n🏆 لقبت: {rank}", show_alert=True)
 
     else:
         await query.answer()
@@ -901,7 +971,7 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         seconds = remaining % 60
         await message.reply_text(
             f"⏳ <b>صبر کن</b> ⏳\n\n"
-            f"{emoji} <b>{point_name} هات :</b> {current_total}\n\n"
+            f"{emoji} <b>{point_name} هات :</b> {current_total:,}\n\n"
             f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
             parse_mode="HTML",
         )
@@ -909,9 +979,13 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     new_total = add_points(user.id, reward)
 
+    # ===== گرفتن رتبه جدید =====
+    rank = get_rank(new_total, gender)
+
     await message.reply_text(
         f"{emoji} <b>{reward} {point_name} گرفتی</b> {emoji}\n\n"
-        f"💰 <b>{point_name} هات :</b> {new_total}\n\n"
+        f"💰 <b>{point_name} هات :</b> {new_total:,}\n"
+        f"🏆 <b>لقبت :</b> {rank}\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
