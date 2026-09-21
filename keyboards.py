@@ -3,11 +3,19 @@ from config import CHANNEL_LINK
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    """دکمههای عضویت در کانال + تایید"""
+    """دکمه‌های عضویت در کانال + تایید (رنگی)"""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 کانال کصخل خیز", url=CHANNEL_LINK),
-            InlineKeyboardButton("✅ عضو شدم", callback_data="check_join"),
+            InlineKeyboardButton(
+                "📢 کانال کصخل خیز",
+                url=CHANNEL_LINK,
+                api_kwargs={"style": "primary"},  # 🔵 آبی
+            ),
+            InlineKeyboardButton(
+                "✅ عضو شدم",
+                callback_data="check_join",
+                api_kwargs={"style": "success"},  # 🟢 سبز
+            ),
         ]
     ])
 
