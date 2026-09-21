@@ -1,4 +1,5 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import time
+from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 
@@ -10,13 +11,17 @@ from config import (
     KIR_WORD, KOS_WORD, MALE_GOOD_WORD, FEMALE_GOOD_WORD,
     HIGH_WORD, TOP_WORD,
     HIGH_THRESHOLD, TOP_THRESHOLD,
+    HELP_EXPIRE_SECONDS,
 )
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
     log_join_action, get_user, get_stats,
     add_points, can_claim, get_points,
 )
-from keyboards import join_keyboard, gender_keyboard, confirm_keyboard
+from keyboards import (
+    join_keyboard, gender_keyboard, confirm_keyboard,
+    help_keyboard, help_back_keyboard,
+)
 
 
 # ===== متن‌ها =====
@@ -62,7 +67,7 @@ MALE_DONT_TEXT = (
     "🌹 <b>سلام گل پسر</b> 🌹\n\n"
     "شنیدم که از این ربات ما <b>خوشت اومده</b> 😏\n\n"
     "می‌خوای عوض این ربات بشی <b>موفق باشی</b> 🎯\n\n"
-    "می‌خوای <b>امتیاز جمع کنی</b> موفق باشی 🏆"
+    "می‌خوای <b>پوینت جمع کنی</b> موفق باشی 🏆"
 )
 
 FEMALE_DONT_TEXT = (
@@ -70,7 +75,7 @@ FEMALE_DONT_TEXT = (
     "شنیدم که با این ربات <b>حال کردی</b> 😄\n\n"
     "منم جات بودم حال میکردم ولی خب 😅\n\n"
     "تو می‌تونی از این ربات استفاده های زیادی بکنی\n"
-    "مثلا <b>امتیاز جمع کنی</b> به رفیقات <b>پز بدی</b> 💅"
+    "مثلا <b>پوینت جمع کنی</b> به رفیقات <b>پز بدی</b> 💅"
 )
 
 CONFIRM_TEXT = (
@@ -118,75 +123,60 @@ FEMALE_GOOD_NOT_ALLOWED = (
 )
 
 HIGH_NOT_ALLOWED = (
-    "💎 <b>این کلمه مخصوص بالای ۵۰۰۰۰ امتیازه!</b>\n\n"
-    f"الان امتیازت کمه. برو امتیاز جمع کن !"
+    "💎 <b>این کلمه مخصوص بالای ۵۰۰۰۰ پوینته!</b>\n\n"
+    f"الان پوینتت کمه. برو پوینت جمع کن !"
 )
 
 TOP_NOT_ALLOWED = (
-    "🍰 <b>این کلمه مخصوص بالای ۲۰۰۰۰۰ امتیازه!</b>\n\n"
-    f"الان امتیازت کمه. برو امتیاز جمع کن !"
+    "🍰 <b>این کلمه مخصوص بالای ۲۰۰۰۰۰ پوینته!</b>\n\n"
+    f"الان پوینتت کمه. برو پوینت جمع کن !"
 )
 
 
 # ============================================================
-# راهنمای کامل
+# راهنمای شخصی‌سازی‌شده
 # ============================================================
 
-def help_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های رنگی راهنما"""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🍌 کیر پوینت",
-                callback_data="help_kir",
-                api_kwargs={"style": "success"},
-            ),
-            InlineKeyboardButton(
-                "🍑 کص پوینت",
-                callback_data="help_kos",
-                api_kwargs={"style": "success"},
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🌹 پسر بی‌جنبه",
-                callback_data="help_male_dont",
-                api_kwargs={"style": "danger"},
-            ),
-            InlineKeyboardButton(
-                "🌸 دختر بی‌جنبه",
-                callback_data="help_female_dont",
-                api_kwargs={"style": "danger"},
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "💎 سلام گلم",
-                callback_data="help_high",
-                api_kwargs={"style": "primary"},
-            ),
-            InlineKeyboardButton(
-                "🍰 کیک",
-                callback_data="help_top",
-                api_kwargs={"style": "primary"},
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "💰 امتیاز من",
-                callback_data="help_mypoints",
-                api_kwargs={"style": "primary"},
-            ),
-        ],
-    ])
+# ===== متن راهنمای کوتاه (شخصی) =====
+SHORT_HELP = {
+    "male_have": (
+        "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
+        "👋 خب پس تو <b>پسر با جنبه</b> هستی!\n\n"
+        "🍌 توی گروه بنویس <b>کیر</b> → <b>۵ کیر پوینت</b> بگیر\n\n"
+        "⏳ هر ۳ دقیقه یه بار\n\n"
+        "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
+    ),
+    "female_have": (
+        "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
+        "👋 خب پس تو <b>دختر با جنبه</b> هستی!\n\n"
+        "🍑 توی گروه بنویس <b>کص</b> → <b>۵ کص پوینت</b> بگیر\n\n"
+        "⏳ هر ۳ دقیقه یه بار\n\n"
+        "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
+    ),
+    "male_dont": (
+        "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
+        "👋 خب پس تو <b>پسر بی‌جنبه</b> هستی!\n\n"
+        "🌹 توی گروه بنویس <b>پسر خوب</b> → <b>۱ پوینت</b> بگیر\n\n"
+        "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری\n\n"
+        "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
+    ),
+    "female_dont": (
+        "📖 <b>راهنمای کصخل خیز</b> 📖\n\n"
+        "👋 خب پس تو <b>دختر بی‌جنبه</b> هستی!\n\n"
+        "🌸 توی گروه بنویس <b>دختر خوب</b> → <b>۱ پوینت</b> بگیر\n\n"
+        "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری\n\n"
+        "👇 برای توضیحات بیشتر، دکمه‌های زیر رو بزن:"
+    ),
+}
 
 
-HELP_MAIN_TEXT = (
-    "📖 <b>راهنمای کصخل خیز</b> 📖\n"
+# ===== متن توضیحات بلند =====
+LONG_HELP_TEXT = (
+    "📖 <b>راهنمای کصخل خیز — توضیحات بلند</b> 📖\n"
     "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
     "👋 <b>میبینم که تازه واردی...</b>\n\n"
-    "ببین بزار برات راحت توضیح بدم که دقیقاً چیکار باید بکنی:\n\n"
+    "ببین بزار برات راحت توضیح بدم:\n\n"
 
     "😤 <b>مالک دوم از آدم‌های بی‌جنبه خوشش نمیاد</b>، "
     "به خاطر همین تا اونجایی که جا داشته <b>محدودشون کرده</b>. "
@@ -197,13 +187,11 @@ HELP_MAIN_TEXT = (
     "━━━━━━━━━━━━━━━━━━━━━━\n"
     "🎁 <b>کلمات هیجان‌انگیز ماهانه</b>\n\n"
 
-    "از طرفی دیگه، شما می‌تونید <b>هر ماه</b> از کلمات هیجان‌انگیز "
-    "استفاده کنی.\n\n"
+    "شما می‌تونید <b>هر ماه</b> از کلمات هیجان‌انگیز استفاده کنی.\n\n"
 
-    "شاید نفهمی چی گفتم، پس <b>ساده‌تر</b> توضیح میدم:\n\n"
-
-    "ما مثلاً میایم کلمه <b>سلام</b> رو به عنوان <b>کد ماه</b> استفاده می‌کنیم. "
-    "هر کی <b>سریع‌تر</b> اون رو پیدا کنه، می‌تونه <b>کیر پوینت هاشو بیشتر کنه</b> 🍌\n\n"
+    "مثلاً میایم کلمه <b>سلام</b> رو به عنوان <b>کد ماه</b> استفاده می‌کنیم. "
+    "هر کی <b>سریع‌تر</b> اون رو پیدا کنه، می‌تونه "
+    "<b>کیر پوینت هاشو بیشتر کنه</b> 🍌\n\n"
 
     "⚠️ ولی این کلمات <b>محدودن</b> و <b>افراد کمی</b> می‌تونن استفاده کنن. "
     "کلاً اگه مثلاً <b>۶۰ نفر</b> استفاده کنن، دیگه کسی نیست که بخواد "
@@ -222,32 +210,29 @@ HELP_MAIN_TEXT = (
     "مگر این که <b>حمایت گسترده</b> داشته باشیم 💪\n\n"
 
     "━━━━━━━━━━━━━━━━━━━━━━\n"
-    "📋 <b>کلمه‌ها و امتیازها:</b>\n\n"
+    "📋 <b>کلمه‌ها و پوینت‌ها:</b>\n\n"
 
-    "🍌 <b>پسر با جنبه</b> → بنویس <b>کیر</b> → ۵ کیر پوینت\n"
-    "🍑 <b>دختر با جنبه</b> → بنویس <b>کص</b> → ۵ کص پوینت\n"
-    "🌹 <b>پسر بی‌جنبه</b> → بنویس <b>پسر خوب</b> → ۱ پوینت\n"
-    "🌸 <b>دختر بی‌جنبه</b> → بنویس <b>دختر خوب</b> → ۱ پوینت\n"
-    "💎 <b>بالای ۵۰۰۰۰</b> → بنویس <b>سلام گلم</b> → ۱ پوینت\n"
-    "🍰 <b>بالای ۲۰۰۰۰۰</b> → بنویس <b>کیک</b> → ۱ پوینت\n\n"
+    "🍌 <b>پسر با جنبه</b> → <b>کیر</b> → ۵ کیر پوینت\n"
+    "🍑 <b>دختر با جنبه</b> → <b>کص</b> → ۵ کص پوینت\n"
+    "🌹 <b>پسر بی‌جنبه</b> → <b>پسر خوب</b> → ۱ پوینت\n"
+    "🌸 <b>دختر بی‌جنبه</b> → <b>دختر خوب</b> → ۱ پوینت\n"
+    "💎 <b>بالای ۵۰۰۰۰</b> → <b>سلام گلم</b> → ۱ پوینت\n"
+    "🍰 <b>بالای ۲۰۰۰۰۰</b> → <b>کیک</b> → ۱ پوینت\n\n"
 
     "━━━━━━━━━━━━━━━━━━━━━━\n"
     "⏳ <b>محدودیت زمانی:</b>\n"
-    "هر <b>۳ دقیقه</b> یه بار می‌تونی امتیاز بگیری.\n\n"
+    "هر <b>۳ دقیقه</b> یه بار.\n\n"
 
     "━━━━━━━━━━━━━━━━━━━━━━\n"
     "⚠️ <b>نکات مهم:</b>\n\n"
-    "🚫 اگه <b>بی‌جنبه</b> باشی، <b>نمی‌تونی از ۱۰۰٪ ربات استفاده کنی</b> "
-    "و فقط <b>۱ پوینت</b> می‌گیری.\n\n"
-    "🚫 اگه توی ربات <b>/start</b> نزدی یا <b>جنسیتت</b> رو انتخاب نکردی، "
-    "هیچ امتیازی نمی‌گیری.\n\n"
+    "🚫 اگه <b>بی‌جنبه</b> باشی، <b>فقط ۱ پوینت</b> می‌گیری.\n"
+    "🚫 اگه <b>/start</b> نزدی، هیچ پوینتی نمی‌گیری.\n"
     "✅ <b>فقط پسرای با جنبه</b> → کیر پوینت\n"
-    "✅ <b>فقط دخترای با جنبه</b> → کص پوینت\n\n"
-
-    "━━━━━━━━━━━━━━━━━━━━━━\n"
-    "👇 <b>برای توضیح بیشتر، روی دکمه‌های زیر بزن:</b>"
+    "✅ <b>فقط دخترای با جنبه</b> → کص پوینت"
 )
 
+
+# ===== متن‌های اختصاصی هر بخش =====
 HELP_KIR_TEXT = (
     "🍌 <b>کیر پوینت</b> 🍌\n\n"
     "👦 فقط <b>پسرای با جنبه</b> می‌تونن بگیرن.\n\n"
@@ -256,11 +241,7 @@ HELP_KIR_TEXT = (
     "💰 <b>چقدر میده؟</b>\n"
     "<b>۵ کیر پوینت</b> هر بار.\n\n"
     "⏳ <b>هر چند وقت؟</b>\n"
-    "هر <b>۳ دقیقه</b> یه بار.\n\n"
-    "🚫 <b>کی نمی‌گیره؟</b>\n"
-    "• دخترا\n"
-    "• پسرای بی‌جنبه\n"
-    "• کسایی که استارت نزدن"
+    "هر <b>۳ دقیقه</b> یه بار."
 )
 
 HELP_KOS_TEXT = (
@@ -271,64 +252,46 @@ HELP_KOS_TEXT = (
     "💰 <b>چقدر میده؟</b>\n"
     "<b>۵ کص پوینت</b> هر بار.\n\n"
     "⏳ <b>هر چند وقت؟</b>\n"
-    "هر <b>۳ دقیقه</b> یه بار.\n\n"
-    "🚫 <b>کی نمی‌گیره؟</b>\n"
-    "• پسرا\n"
-    "• دخترای بی‌جنبه\n"
-    "• کسایی که استارت نزدن"
+    "هر <b>۳ دقیقه</b> یه بار."
 )
 
 HELP_MALE_DONT_TEXT = (
     "🌹 <b>پسر بی‌جنبه</b> 🌹\n\n"
-    "😐 اگه <b>پسر</b> هستی ولی <b>جنبه نداری</b>، "
-    "این بخش مخصوص توئه.\n\n"
+    "😐 اگه <b>پسر</b> هستی ولی <b>جنبه نداری</b>.\n\n"
     "📝 <b>چیکار کنم؟</b>\n"
     "توی گروه بنویس <b>پسر خوب</b>.\n\n"
     "💰 <b>چقدر میده؟</b>\n"
     "فقط <b>۱ پوینت</b> هر بار.\n\n"
-    "⚠️ <b>نکته:</b>\n"
-    "چون بی‌جنبه‌ای، نمی‌تونی از ۱۰۰٪ ربات استفاده کنی!"
+    "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری!"
 )
 
 HELP_FEMALE_DONT_TEXT = (
     "🌸 <b>دختر بی‌جنبه</b> 🌸\n\n"
-    "😐 اگه <b>دختر</b> هستی ولی <b>جنبه نداری</b>، "
-    "این بخش مخصوص توئه.\n\n"
+    "😐 اگه <b>دختر</b> هستی ولی <b>جنبه نداری</b>.\n\n"
     "📝 <b>چیکار کنم؟</b>\n"
     "توی گروه بنویس <b>دختر خوب</b>.\n\n"
     "💰 <b>چقدر میده؟</b>\n"
     "فقط <b>۱ پوینت</b> هر بار.\n\n"
-    "⚠️ <b>نکته:</b>\n"
-    "چون بی‌جنبه‌ای، نمی‌تونی از ۱۰۰٪ ربات استفاده کنی!"
+    "⚠️ چون بی‌جنبه‌ای، دسترسی محدود داری!"
 )
 
-HELP_HIGH_TEXT = (
-    "💎 <b>سلام گلم</b> 💎\n\n"
-    "🔓 <b>مخصوص بالای ۵۰۰۰۰ امتیاز!</b>\n\n"
-    "📝 <b>چطور بگیرم؟</b>\n"
-    "اول باید <b>۵۰۰۰۰ امتیاز</b> جمع کنی، "
-    "بعد می‌تونی بنویسی <b>سلام گلم</b>.\n\n"
-    "💰 <b>چقدر میده؟</b>\n"
-    "<b>۱ پوینت</b> هر بار.\n\n"
-    "🔒 <b>اگه امتیازت کم باشه:</b>\n"
-    "ربات بهت میگه برو امتیاز جمع کن!"
-)
 
-HELP_TOP_TEXT = (
-    "🍰 <b>کیک</b> 🍰\n\n"
-    "🔓 <b>مخصوص بالای ۲۰۰۰۰۰ امتیاز!</b>\n\n"
-    "📝 <b>چطور بگیرم؟</b>\n"
-    "اول باید <b>۲۰۰۰۰۰ امتیاز</b> جمع کنی، "
-    "بعد می‌تونی بنویسی <b>کیک</b>.\n\n"
-    "💰 <b>چقدر میده؟</b>\n"
-    "<b>۱ پوینت</b> هر بار.\n\n"
-    "🔒 <b>اگه امتیازت کم باشه:</b>\n"
-    "ربات بهت میگه برو امتیاز جمع کن!"
-)
+# ===== سشن راهنما (برای قفل دکمه‌ها) =====
+_help_sessions = {}  # {user_id: timestamp}
+
+
+def _is_help_valid(user_id: int) -> bool:
+    ts = _help_sessions.get(user_id)
+    if not ts:
+        return False
+    return (time.time() - ts) < HELP_EXPIRE_SECONDS
+
+
+def _create_help_session(user_id: int):
+    _help_sessions[user_id] = time.time()
 
 
 # ===== توابع کمکی =====
-
 async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     try:
         member = await context.bot.get_chat_member(
@@ -506,7 +469,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/mypoints - دیدن امتیازهای خودت"""
+    """/mypoints - دیدن پوینت‌های خودت"""
     user = update.effective_user
     db_user = get_user(user.id)
 
@@ -518,7 +481,7 @@ async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = info["points"] if info else 0
 
     await update.message.reply_text(
-        f"💰 <b>امتیازت:</b> {total}\n\n"
+        f"💰 <b>پوینتت:</b> {total}\n\n"
         f"🍌 کیر → ۵ کیر پوینت\n"
         f"🍑 کص → ۵ کص پوینت\n"
         f"🌹 پسر خوب → ۱ پوینت\n"
@@ -540,11 +503,6 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in message.new_chat_members:
         if member.id == context.bot.id:
             await message.reply_text(GROUP_WELCOME_TEXT, parse_mode="HTML")
-            await message.reply_text(
-                HELP_MAIN_TEXT,
-                reply_markup=help_keyboard(),
-                parse_mode="HTML",
-            )
             return
 
 
@@ -560,9 +518,26 @@ async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "راهنما" not in message.text:
         return
 
+    user = message.from_user
+    db_user = get_user(user.id)
+
+    # اگه استارت نزده
+    if not db_user or not db_user.get("gender"):
+        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
+        return
+
+    gender = db_user["gender"]
+
+    # ساخت سشن راهنما
+    _create_help_session(user.id)
+
+    # ارسال راهنمای کوتاه مخصوص جنسیت
+    text = SHORT_HELP.get(gender, SHORT_HELP["male_have"])
+    keyboard = help_keyboard(user.id, gender)
+
     await message.reply_text(
-        HELP_MAIN_TEXT,
-        reply_markup=help_keyboard(),
+        text,
+        reply_markup=keyboard,
         parse_mode="HTML",
     )
 
@@ -571,66 +546,129 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """کلیک روی دکمه‌های راهنما"""
     query = update.callback_query
     data = query.data
+    clicker_id = query.from_user.id
 
-    back_button = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🔙 برگشت به راهنما",
-                callback_data="help_main",
-                api_kwargs={"style": "primary"},
-            ),
-        ]
-    ])
+    # ===== چک امنیت: فقط صاحب راهنما =====
+    parts = data.split("_")
+    if len(parts) < 3:
+        await query.answer()
+        return
 
-    mapping = {
-        "help_kir":         HELP_KIR_TEXT,
-        "help_kos":         HELP_KOS_TEXT,
-        "help_male_dont":   HELP_MALE_DONT_TEXT,
-        "help_female_dont": HELP_FEMALE_DONT_TEXT,
-        "help_high":        HELP_HIGH_TEXT,
-        "help_top":         HELP_TOP_TEXT,
-    }
+    # آخرین بخش = user_id صاحب راهنما
+    try:
+        owner_id = int(parts[-1])
+    except ValueError:
+        await query.answer()
+        return
 
-    if data == "help_main":
+    if clicker_id != owner_id:
+        await query.answer(
+            "🚫 تو دسترسی نداری!\n"
+            "این پنل فقط برای کسیه که راهنما رو زده.",
+            show_alert=True,
+        )
+        return
+
+    # ===== چک انقضای سشن =====
+    if not _is_help_valid(owner_id):
+        await query.answer(
+            "⏰ این راهنما منقضی شده!\n"
+            "دوباره بنویس «راهنما».",
+            show_alert=True,
+        )
+        return
+
+    # ===== تشخیص نوع درخواست =====
+    if "long" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "male_have"
         try:
             await query.edit_message_text(
-                HELP_MAIN_TEXT,
-                reply_markup=help_keyboard(),
+                LONG_HELP_TEXT,
+                reply_markup=help_back_keyboard(owner_id, gender),
                 parse_mode="HTML",
             )
         except Exception:
             pass
         await query.answer()
-        return
 
-    if data == "help_mypoints":
-        user = query.from_user
-        db_user = get_user(user.id)
-        if not db_user or not db_user.get("gender"):
-            await query.answer("اول /start بزن!", show_alert=True)
-            return
-        info = get_points(user.id)
-        total = info["points"] if info else 0
-        await query.answer(f"💰 امتیازت: {total}", show_alert=True)
-        return
-
-    if data not in mapping:
+    elif "back" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "male_have"
+        text = SHORT_HELP.get(gender, SHORT_HELP["male_have"])
+        try:
+            await query.edit_message_text(
+                text,
+                reply_markup=help_keyboard(owner_id, gender),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
         await query.answer()
-        return
 
-    try:
-        await query.edit_message_text(
-            mapping[data],
-            reply_markup=back_button,
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        print(f"[help_callback error] {e}")
-    await query.answer()
+    elif "kir" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "male_have"
+        try:
+            await query.edit_message_text(
+                HELP_KIR_TEXT,
+                reply_markup=help_back_keyboard(owner_id, gender),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        await query.answer()
+
+    elif "kos" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "female_have"
+        try:
+            await query.edit_message_text(
+                HELP_KOS_TEXT,
+                reply_markup=help_back_keyboard(owner_id, gender),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        await query.answer()
+
+    elif "male_dont" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "male_dont"
+        try:
+            await query.edit_message_text(
+                HELP_MALE_DONT_TEXT,
+                reply_markup=help_back_keyboard(owner_id, gender),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        await query.answer()
+
+    elif "female_dont" in data:
+        db_user = get_user(owner_id)
+        gender = db_user["gender"] if db_user else "female_dont"
+        try:
+            await query.edit_message_text(
+                HELP_FEMALE_DONT_TEXT,
+                reply_markup=help_back_keyboard(owner_id, gender),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        await query.answer()
+
+    elif "mypoints" in data:
+        info = get_points(owner_id)
+        total = info["points"] if info else 0
+        await query.answer(f"💰 پوینتت: {total}", show_alert=True)
+
+    else:
+        await query.answer()
 
 
 async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر کلی امتیاز — همه کلمات رو چک میکنه"""
+    """هندلر کلی پوینت — همه کلمات رو چک میکنه"""
     message = update.message
     if not message or not message.text:
         return
