@@ -7,16 +7,23 @@ from config import DATABASE_URL
 
 def get_connection():
     """اتصال به دیتابیس Postgres"""
-    # Railway از URL خاصی استفاده میکنه
+    if not DATABASE_URL:
+        raise ValueError(
+            "DATABASE_URL تنظیم نشده! برو توی Railway → Variables → "
+            "DATABASE_URL رو با Reference از Postgres ست کن."
+        )
+
     url = DATABASE_URL
-    if url and url.startswith("postgres://"):
+    # Railway از postgres:// استفاده میکنه ولی psycopg2 نیاز به postgresql:// داره
+    if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+
     conn = psycopg2.connect(url)
     return conn
 
 
 def init_db():
-    """ساخت جدولها"""
+    """ساخت جدول‌ها"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -188,6 +195,7 @@ def add_kir_points(user_id: int, amount: int) -> int:
 
 
 def can_claim_kir(user_id: int, cooldown_seconds: int):
+    """Returns: (can_claim: bool, remaining_seconds: int)"""
     info = get_kir_points(user_id)
 
     if not info or not info.get("last_claimed"):
