@@ -48,3 +48,21 @@ def gender_keyboard() -> InlineKeyboardMarkup:
             ),
         ],
     ])
+
+
+def confirm_keyboard(gender_value: str) -> InlineKeyboardMarkup:
+    """دکمه‌های تأیید نهایی — «مطمئنم» و «مطمئن نیستم»"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "✅ مطمئنم",
+                callback_data=f"confirm_{gender_value}",
+                api_kwargs={"style": "success"},  # 🟢 سبز
+            ),
+            InlineKeyboardButton(
+                "❌ مطمئن نیستم",
+                callback_data=f"cancel_{gender_value}",
+                api_kwargs={"style": "danger"},  # 🔴 قرمز
+            ),
+        ]
+    ])
