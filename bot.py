@@ -58,15 +58,20 @@ def main():
         rahnama_handler,
     ))
 
-    # کلمات پوینت
-    all_words_pattern = "|".join([
-        KIR_WORD, KOS_WORD,
-        MALE_GOOD_WORD, FEMALE_GOOD_WORD,
-        HIGH_WORD, TOP_WORD,
-    ])
+    # ===== کلمات پوینت (فقط تک‌کلمه‌ای) =====
+    single_words_pattern = (
+        r"^\s*("
+        + KIR_WORD + "|"
+        + KOS_WORD + "|"
+        + MALE_GOOD_WORD + "|"
+        + FEMALE_GOOD_WORD + "|"
+        + HIGH_WORD + "|"
+        + TOP_WORD
+        + r")\s*$"
+    )
 
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(all_words_pattern),
+        filters.TEXT & ~filters.COMMAND & filters.Regex(single_words_pattern),
         points_handler,
     ))
 
