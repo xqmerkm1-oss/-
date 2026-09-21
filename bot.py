@@ -16,6 +16,7 @@ from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
     my_points,
     group_welcome, rahnama_handler, help_callback, points_handler,
+    auto_close_help_panel,
 )
 
 logging.basicConfig(
@@ -74,6 +75,16 @@ def main():
         filters.TEXT & ~filters.COMMAND & filters.Regex(single_words_pattern),
         points_handler,
     ))
+
+    # ===== تایمر بستن خودکار پنل راهنما =====
+    if app.job_queue:
+        app.job_queue.run_repeating(
+            auto_close_help_panel,
+            interval=30,
+            first=30,
+            name="auto_close_help",
+        )
+        logger.info("✅ Help auto-close timer started (every 30s)")
 
     if RAILWAY_DOMAIN:
         webhook_url = f"https://{RAILWAY_DOMAIN}/{BOT_TOKEN}"
