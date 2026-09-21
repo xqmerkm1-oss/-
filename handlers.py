@@ -13,17 +13,20 @@ from config import (
     HIGH_WORD, TOP_WORD,
     HIGH_THRESHOLD, TOP_THRESHOLD,
     HELP_EXPIRE_SECONDS,
+    INACTIVITY_DAYS, INACTIVITY_PENALTY,
     get_rank, get_next_rank,
 )
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
     log_join_action, get_user, get_stats,
-    add_points, can_claim, get_points,
+    add_points, can_claim, get_points, subtract_points,
+    get_warning, add_warning, restrict_user, is_restricted,
+    update_activity, get_inactive_users, mark_inactive, get_inactive_list,
 )
 from keyboards import (
     join_keyboard, gender_keyboard, confirm_keyboard,
     help_keyboard, help_back_keyboard,
-    joined_keyboard,
+    joined_keyboard, inactive_keyboard,
 )
 
 
@@ -134,6 +137,52 @@ HIGH_NOT_ALLOWED = (
 TOP_NOT_ALLOWED = (
     "🍰 <b>این کلمه مخصوص بالای ۲۰۰۰۰۰ پوینته!</b>\n\n"
     f"الان پوینتت کمه. برو پوینت جمع کن !"
+)
+
+# ===== سلف =====
+SELF_WARNING_TEXT = (
+    "⚠️ <b>اخطار!</b> ⚠️\n\n"
+    "🚫 <b>شما حق نداری از ربات سلف استفاده کنی!</b>\n\n"
+    "📌 این ربات فقط توی <b>گروه‌ها</b> کار می‌کنه.\n\n"
+    "⚠️ اگه <b>۳ بار دیگه</b> تکرار کنی، "
+    "به مدت <b>۱ روز</b> محدود میشی !"
+)
+
+SELF_RESTRICTED_TEXT = (
+    "🚫 <b>تو محدود شدی!</b> 🚫\n\n"
+    "⏰ به مدت <b>۱ روز</b> نمیتونی از ربات استفاده کنی.\n\n"
+    "📌 دلیل: <b>استفاده از سلف</b> و فرستادن کلمه‌ها توی چت خصوصی."
+)
+
+# ===== عدم فعالیت =====
+INACTIVE_REMINDER_TEXT = (
+    "🔔 <b>سلام رفیق!</b>\n\n"
+    "😴 دیدم که <b>۳ روزه</b> فعالیتی نکردی...\n\n"
+    "🎯 بیا برگرد به ربات و <b>پوینت جمع کن</b>!\n\n"
+    "👇 یکی رو انتخاب کن:"
+)
+
+INACTIVE_STAY_TEXT = (
+    "✅ <b>ایول!</b> خوشحالم که برگشتی 😎\n\n"
+    "🏃 برو توی گروه و <b>پوینت جمع کن</b>!\n\n"
+    "⏳ منتظرتم !"
+)
+
+INACTIVE_LEAVE_TEXT = (
+    "👋 <b>خب پس سیکتیر بابا...</b>\n\n"
+    "🚶 می‌دونم که دیگه نمی‌خوای فعالیت کنی.\n\n"
+    "⚠️ <b>ولی توجه کن:</b>\n"
+    "از این به بعد <b>هر روز ۲۰۰ پوینت</b> ازت کم میشه.\n\n"
+    "💡 اگه پشیمون شدی، کافیه توی گروه <b>پوینت جمع کنی</b> "
+    "تا دوباره فعال بشی."
+)
+
+INACTIVE_DAILY_NOTICE = (
+    "⚠️ <b>اخطار روزانه</b>\n\n"
+    "😴 چون گفتی نمی‌خوای فعالیت کنی،\n"
+    "امروز <b>۲۰۰ پوینت</b> ازت کم شد.\n\n"
+    "💰 <b>پوینتت الان:</b> {points}\n\n"
+    "💡 برای برگشت به حالت عادی، توی گروه <b>پوینت جمع کن</b>!"
 )
 
 
@@ -316,7 +365,6 @@ HELP_FEMALE_DONT_TEXT = (
 
 
 # ===== سشن راهنما =====
-# {user_id: (timestamp, chat_id, message_id)}
 _help_sessions = {}
 
 
@@ -340,7 +388,7 @@ def _update_help_activity(user_id: int):
 
 
 async def auto_close_help_panel(context: ContextTypes.DEFAULT_TYPE):
-    """هر ۳۰ ثانیه چک میکنه کدوم پنل‌های راهنما منقضی شدن"""
+    """بستن خودکار پنل راهنما"""
     now = time.time()
     expired_users = []
 
@@ -382,6 +430,9 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+
+    # آپدیت فعالیت
+    update_activity(user.id)
 
     create_or_update_user(
         user_id=user.id,
@@ -551,6 +602,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/mypoints - دیدن پوینت‌های خودت"""
     user = update.effective_user
+    update_activity(user.id)
+
     db_user = get_user(user.id)
 
     if not db_user or not db_user.get("gender"):
@@ -577,7 +630,7 @@ async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def my_points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستورات کیرام / کصام / پوینتام — نمایش پوینت‌ها + رتبه"""
+    """دستورات کیرام / کصام / پوینتام"""
     message = update.message
     if not message or not message.text:
         return
@@ -587,6 +640,21 @@ async def my_points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = message.from_user
     if not user or user.is_bot:
+        return
+
+    # آپدیت فعالیت
+    update_activity(user.id)
+
+    # چک محدودیت
+    restricted, remaining = is_restricted(user.id)
+    if restricted:
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        await message.reply_text(
+            f"🚫 <b>تو محدود شدی!</b> 🚫\n\n"
+            f"⏰ <b>باقی‌مونده:</b> {hours} ساعت و {minutes} دقیقه",
+            parse_mode="HTML",
+        )
         return
 
     text = message.text.strip()
@@ -674,7 +742,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی کاربر توی گروه کلمه «راهنما» رو نوشت"""
+    """کلمه «راهنما» توی گروه"""
     message = update.message
     if not message or not message.text:
         return
@@ -686,6 +754,8 @@ async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = message.from_user
+    update_activity(user.id)
+
     db_user = get_user(user.id)
 
     if not db_user or not db_user.get("gender"):
@@ -716,7 +786,6 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     clicker_id = query.from_user.id
 
-    # ===== دکمه «راهنما» توی پیام تأیید =====
     if data == "show_help":
         db_user = get_user(clicker_id)
         if not db_user or not db_user.get("gender"):
@@ -744,7 +813,6 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
-    # ===== بقیه کد =====
     parts = data.split("_")
     if len(parts) < 3:
         await query.answer()
@@ -866,7 +934,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر کلی پوینت — فقط کلمات تک‌کلمه‌ای"""
+    """هندلر کلمات پوینت — فقط تک‌کلمه‌ای"""
     message = update.message
     if not message or not message.text:
         return
@@ -878,10 +946,25 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user or user.is_bot:
         return
 
+    # آپدیت فعالیت
+    update_activity(user.id)
+
+    # چک محدودیت
+    restricted, remaining = is_restricted(user.id)
+    if restricted:
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        await message.reply_text(
+            f"🚫 <b>تو محدود شدی!</b> 🚫\n\n"
+            f"⏰ به مدت <b>۱ روز</b> نمیتونی از ربات استفاده کنی.\n\n"
+            f"⏳ <b>باقی‌مونده:</b> {hours} ساعت و {minutes} دقیقه",
+            parse_mode="HTML",
+        )
+        return
+
     text = message.text.strip()
 
     exact_match = None
-
     if text == KIR_WORD:
         exact_match = KIR_WORD
     elif text == KOS_WORD:
@@ -899,7 +982,6 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     db_user = get_user(user.id)
-
     if not db_user or not db_user.get("gender"):
         await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
@@ -978,8 +1060,6 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     new_total = add_points(user.id, reward)
-
-    # ===== گرفتن رتبه جدید =====
     rank = get_rank(new_total, gender)
 
     await message.reply_text(
@@ -989,3 +1069,124 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
+
+
+# ===== تشخیص سلف =====
+
+async def check_self(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اگه کاربر توی چت خصوصی کلمه امتیاز نوشت → اخطار"""
+    message = update.message
+    if not message or not message.text:
+        return
+
+    if message.chat.type != ChatType.PRIVATE:
+        return
+
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+
+    text = message.text.strip()
+
+    words = [KIR_WORD, KOS_WORD, MALE_GOOD_WORD, FEMALE_GOOD_WORD, HIGH_WORD, TOP_WORD]
+    if text not in words:
+        return
+
+    restricted, remaining = is_restricted(user.id)
+    if restricted:
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        await message.reply_text(
+            SELF_RESTRICTED_TEXT + f"\n\n⏰ <b>باقی‌مونده:</b> {hours} ساعت و {minutes} دقیقه",
+            parse_mode="HTML",
+        )
+        return
+
+    count = add_warning(user.id)
+
+    if count >= 3:
+        restrict_user(user.id, hours=24)
+        try:
+            await message.reply_text(SELF_RESTRICTED_TEXT, parse_mode="HTML")
+        except Exception:
+            pass
+    else:
+        remaining_warnings = 3 - count
+        text_out = SELF_WARNING_TEXT + f"\n\n⚠️ <b>{remaining_warnings}</b> اخطار دیگه تا محدودیت!"
+        try:
+            await message.reply_text(text_out, parse_mode="HTML")
+        except Exception:
+            pass
+
+
+# ===== یادآوری عدم فعالیت =====
+
+async def inactive_reminder_job(context: ContextTypes.DEFAULT_TYPE):
+    """هر روز چک میکنه کاربرای غیرفعال و پیام میده"""
+    inactive_users = get_inactive_users(days=INACTIVITY_DAYS)
+
+    for user in inactive_users:
+        user_id = user["user_id"]
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=INACTIVE_REMINDER_TEXT,
+                reply_markup=inactive_keyboard(user_id),
+                parse_mode="HTML",
+            )
+            mark_inactive(user_id)
+        except Exception as e:
+            print(f"[inactive_reminder_job] user {user_id}: {e}")
+
+
+async def inactive_daily_subtract_job(context: ContextTypes.DEFAULT_TYPE):
+    """هر روز از کاربرای غیرفعال پوینت کم میکنه"""
+    inactive_list = get_inactive_list()
+
+    for entry in inactive_list:
+        user_id = entry["user_id"]
+        try:
+            new_total = subtract_points(user_id, INACTIVITY_PENALTY)
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=INACTIVE_DAILY_NOTICE.format(points=new_total),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            print(f"[inactive_daily_subtract_job] user {user_id}: {e}")
+
+
+async def inactive_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """کلیک روی دکمه‌های یادآوری"""
+    query = update.callback_query
+    data = query.data
+    user_id = query.from_user.id
+
+    parts = data.split("_")
+    try:
+        owner_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.answer()
+        return
+
+    if user_id != owner_id:
+        await query.answer("🚫 این پیام برای تو نیست!", show_alert=True)
+        return
+
+    if data.startswith("inactive_stay_"):
+        update_activity(user_id)
+        try:
+            await query.edit_message_text(INACTIVE_STAY_TEXT, parse_mode="HTML")
+        except Exception:
+            pass
+        await query.answer("✅ خوش برگشتی!")
+
+    elif data.startswith("inactive_leave_"):
+        try:
+            await query.edit_message_text(INACTIVE_LEAVE_TEXT, parse_mode="HTML")
+        except Exception:
+            pass
+        await query.answer("👋 موفق باشی!")
+
+    else:
+        await query.answer()
