@@ -9,7 +9,7 @@ from database import (
 from keyboards import join_keyboard, gender_keyboard
 
 
-# ===== متنها (بولد + ایموجی) =====
+# ===== متن‌ها =====
 WELCOME_TEXT = (
     "🎉 <b>به ربات کصخل خیز خوش اومدین</b> 🎉\n\n"
     "📌 برای استفاده از ربات ابتدا باید عضو کانال "
@@ -26,6 +26,47 @@ JOINED_TEXT = (
     "🎊 <b>بلخره عضو شدی آفرین</b> 🎊\n\n"
     "از <b>جقی بودن</b> دراومدی 😎\n"
     "حالا <b>جنسیتت</b> رو از دکمه های زیر انتخاب کن !"
+)
+
+# ===== متن دکمه‌های جنبه دارم =====
+MALE_HAVE_TEXT = (
+    "🍌 <b>شنیدم دلت کیر میخواد</b> 🍌\n\n"
+    "تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به گایی هات برای ایران 🤡\n\n"
+    "کیر و کص جمع کن تا بتونی <b>کصخل بهتری</b> باشی\n\n"
+    "شنیدم دلت کیر میخواد🍌\n"
+    "تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به گایی هات برای ایران 🤡\n\n"
+    "کیر و کص جمع کن تا بتونی <b>کصخل بهتری</b> باشی\n\n"
+    "شمارو بعضی وقتا به تخممون میگیریم\n"
+    "عملکردخوب که نه ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی\n"
+    "آپدیت های سالیانه میدیم بیرون\n"
+    "مثل شما می‌تونیم یه کصخل باشیم\n"
+    "پشتیبانی <b>۲۶ ساعته</b>\n"
+    "کاملا رایگان بعضی وقتا پولی"
+)
+
+FEMALE_HAVE_TEXT = (
+    "🍑 <b>شنیدم دلت کص میخواد</b> 🍑\n\n"
+    "تو می‌تونی اینجا به آرزوهات که نه ولی به بهترین <b>کصخل تلگرام</b> تبدیل بشی\n\n"
+    "تو اینجا باید کیر و کص جمع کنی تا بتونی <b>کصخل بهتری</b> باشی\n\n"
+    "شمارو بعضی وقتا به تخممون میگیریم\n"
+    "عملکردخوب که نه ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی\n"
+    "آپدیت های سالیانه میدیم بیرون\n"
+    "مثل شما می‌تونیم یه کصخل باشیم\n"
+    "پشتیبانی <b>۲۶ ساعته</b>\n"
+    "کاملا رایگان بعضی وقتا پولی"
+)
+
+# ===== متن دکمه‌های جنبه ندارم =====
+MALE_DONT_TEXT = (
+    "😐 <b>پسرم جنبه ندارم رو زدی</b>\n\n"
+    "باشه پس تو یه <b>کصخل واقعی</b> هستی 😐\n"
+    "برو عضو کانال بمون تا ببینیم چی میشه !"
+)
+
+FEMALE_DONT_TEXT = (
+    "😐 <b>دخترم جنبه ندارم رو زدی</b>\n\n"
+    "باشه پس تو یه <b>کصخل واقعی</b> هستی 😐\n"
+    "برو عضو کانال بمون تا ببینیم چی میشه !"
 )
 
 
@@ -62,8 +103,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             gender_label = {
                 "female_have": "💁‍♀ دخترم جنبه دارم",
                 "female_dont": "🙅‍♀ دخترم جنبه ندارم",
-                "male_have": "🙋‍♂ پسرم جنبه دارم",
-                "male_dont": "🙆‍♂ پسرم جنبه ندارم",
+                "male_have":   "🙋‍♂ پسرم جنبه دارم",
+                "male_dont":   "🙆‍♂ پسرم جنبه ندارم",
             }.get(db_user["gender"], db_user["gender"])
             await update.message.reply_text(
                 f"👋 <b>خوش برگشتی {user.first_name}</b>\n\n"
@@ -125,33 +166,42 @@ async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """انتخاب جنسیت + جنبه"""
+    """انتخاب جنسیت + جنبه → ویرایش پیام با متن مربوطه"""
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data
 
+    # ===== نقشه دکمه‌ها =====
     mapping = {
-        "gender_female_have": ("female_have", "💁‍♀ دخترم جنبه دارم"),
-        "gender_female_dont": ("female_dont", "🙅‍♀ دخترم جنبه ندارم"),
-        "gender_male_have":   ("male_have",   "🙋‍♂ پسرم جنبه دارم"),
-        "gender_male_dont":   ("male_dont",   "🙆‍♂ پسرم جنبه ندارم"),
+        "gender_male_have":   ("male_have",   MALE_HAVE_TEXT,   "🙋‍♂ پسرم جنبه دارم"),
+        "gender_female_have": ("female_have", FEMALE_HAVE_TEXT, "💁‍♀ دخترم جنبه دارم"),
+        "gender_male_dont":   ("male_dont",   MALE_DONT_TEXT,   "🙆‍♂ پسرم جنبه ندارم"),
+        "gender_female_dont": ("female_dont", FEMALE_DONT_TEXT, "🙅‍♀ دخترم جنبه ندارم"),
     }
 
     if data not in mapping:
         await query.answer()
         return
 
-    gender_value, label = mapping[data]
+    gender_value, response_text, label = mapping[data]
     set_user_gender(user_id, gender_value)
 
+    # ویرایش پیام
     try:
         await query.edit_message_text(
-            f"✅ <b>ثبت شد:</b> {label}\n\n"
-            f"حالا میتونی از ربات استفاده کنی 🎉",
+            response_text,
             parse_mode="HTML",
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[gender_choice error] {e}")
+        try:
+            await query.message.reply_text(
+                response_text,
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
     await query.answer(f"✅ ثبت شد: {label}")
 
 
