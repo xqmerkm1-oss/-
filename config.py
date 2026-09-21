@@ -42,8 +42,11 @@ TOP_THRESHOLD = 200000
 # ===== زمان انقضای راهنما (ثانیه) =====
 HELP_EXPIRE_SECONDS = 300     # ۵ دقیقه
 
+# ===== سیستم عدم فعالیت =====
+INACTIVITY_DAYS = 3           # بعد از ۳ روز عدم فعالیت
+INACTIVITY_PENALTY = 200      # هر روز ۲۰۰ پوینت کسر
+
 # ===== رتبه‌ها =====
-# (حداقل پوینت، لقب)
 MALE_RANKS = [
     (1500000, "👑 شومبول برتر"),
     (800000,  "🥇 کیر طلای"),
@@ -62,7 +65,6 @@ FEMALE_RANKS = [
 
 
 def get_rank(points: int, gender: str) -> str:
-    """گرفتن لقب بر اساس پوینت و جنسیت"""
     if gender == "male_have":
         ranks = MALE_RANKS
     elif gender == "female_have":
@@ -78,10 +80,6 @@ def get_rank(points: int, gender: str) -> str:
 
 
 def get_next_rank(points: int, gender: str):
-    """
-    گرفتن رتبه بعدی و پوینت لازم
-    Returns: (next_title, points_needed) یا (None, 0)
-    """
     if gender == "male_have":
         ranks = sorted(MALE_RANKS, key=lambda x: x[0])
     elif gender == "female_have":
