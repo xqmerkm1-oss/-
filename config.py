@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ===== مقادیر پیشفرض =====
-DEFAULT_BOT_TOKEN = "8845091304:AAGSunCBF1Ijfgyn_do2xjHyUxwjR_fWKpA"
-DEFAULT_CHANNEL_ID = "-1004344839671"
-DEFAULT_CHANNEL_LINK = "https://t.me/Afirstratescumbag"
+DEFAULT_BOT_TOKEN = "8979774904:AAHWGxVXyfpnglyeL7Gj8ldLPH2yCkKdThE"
+DEFAULT_CHANNEL_ID = "-1004372622419"
+DEFAULT_CHANNEL_LINK = "https://t.me/Kaskhelkhiz"
 DEFAULT_DATABASE_PATH = "data/bot.db"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or DEFAULT_BOT_TOKEN
