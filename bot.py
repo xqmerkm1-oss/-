@@ -7,7 +7,7 @@ from telegram.ext import (
 
 from config import BOT_TOKEN
 from database import init_db
-from handlers import start, check_join, gender_choice, stats
+from handlers import start, check_join, gender_choice, confirm_choice, stats
 
 # ===== لاگ =====
 logging.basicConfig(
@@ -16,7 +16,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Railway این متغیر رو خودکار ست میکنه
 RAILWAY_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN")
 PORT = int(os.getenv("PORT", "8080"))
 
@@ -30,9 +29,11 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
     app.add_handler(CallbackQueryHandler(gender_choice, pattern="^gender_"))
+    app.add_handler(CallbackQueryHandler(
+        confirm_choice, pattern="^(confirm|cancel)_"
+    ))
 
     if RAILWAY_DOMAIN:
-        # ===== حالت Webhook (روی Railway) =====
         webhook_url = f"https://{RAILWAY_DOMAIN}/{BOT_TOKEN}"
         logger.info(f"✅ Starting webhook on {webhook_url}")
         app.run_webhook(
@@ -42,7 +43,6 @@ def main():
             webhook_url=webhook_url,
         )
     else:
-        # ===== حالت Polling (لوکال) =====
         logger.info("✅ Starting polling (local mode)...")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
 
