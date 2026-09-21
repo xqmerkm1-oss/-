@@ -228,7 +228,12 @@ LONG_HELP_TEXT = (
     "🚫 اگه <b>بی‌جنبه</b> باشی، <b>فقط ۱ پوینت</b> می‌گیری.\n"
     "🚫 اگه <b>/start</b> نزدی، هیچ پوینتی نمی‌گیری.\n"
     "✅ <b>فقط پسرای با جنبه</b> → کیر پوینت\n"
-    "✅ <b>فقط دخترای با جنبه</b> → کص پوینت"
+    "✅ <b>فقط دخترای با جنبه</b> → کص پوینت\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️ <b>نکته مهم:</b>\n"
+    "کلمه‌ها باید <b>تنها</b> نوشته بشن!\n"
+    "مثلاً فقط <b>کیر</b> — نه <b>سلام کیر</b> ❌"
 )
 
 
@@ -668,119 +673,9 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر کلی پوینت — همه کلمات رو چک میکنه"""
+    """هندلر کلی پوینت — فقط کلمات تک‌کلمه‌ای"""
     message = update.message
     if not message or not message.text:
         return
 
-    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
-        return
-
-    user = message.from_user
-    if not user or user.is_bot:
-        return
-
-    text = message.text
-    db_user = get_user(user.id)
-
-    if not db_user or not db_user.get("gender"):
-        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
-        return
-
-    gender = db_user["gender"]
-    info = get_points(user.id)
-    current_total = info["points"] if info else 0
-
-    reward = 0
-    matched = False
-    emoji = ""
-    point_name = ""
-
-    # 1) پسر با جنبه → کیر
-    if KIR_WORD in text:
-        if gender == "male_have":
-            reward = KIR_POINT_REWARD
-            matched = True
-            emoji = "🍌"
-            point_name = "کیر پوینت"
-        else:
-            await message.reply_text(KIR_NOT_ALLOWED, parse_mode="HTML")
-            return
-
-    # 2) دختر با جنبه → کص
-    elif KOS_WORD in text:
-        if gender == "female_have":
-            reward = KOS_POINT_REWARD
-            matched = True
-            emoji = "🍑"
-            point_name = "کص پوینت"
-        else:
-            await message.reply_text(KOS_NOT_ALLOWED, parse_mode="HTML")
-            return
-
-    # 3) پسر بی‌جنبه → پسر خوب
-    elif MALE_GOOD_WORD in text:
-        if gender == "male_dont":
-            reward = WEAK_POINT_REWARD
-            matched = True
-            emoji = "🌹"
-            point_name = "پسر خوب پوینت"
-        else:
-            await message.reply_text(MALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
-            return
-
-    # 4) دختر بی‌جنبه → دختر خوب
-    elif FEMALE_GOOD_WORD in text:
-        if gender == "female_dont":
-            reward = WEAK_POINT_REWARD
-            matched = True
-            emoji = "🌸"
-            point_name = "دختر خوب پوینت"
-        else:
-            await message.reply_text(FEMALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
-            return
-
-    # 5) بالای ۵۰۰۰۰ → سلام گلم
-    elif HIGH_WORD in text:
-        if current_total < HIGH_THRESHOLD:
-            await message.reply_text(HIGH_NOT_ALLOWED, parse_mode="HTML")
-            return
-        reward = HIGH_POINT_REWARD
-        matched = True
-        emoji = "💎"
-        point_name = "سلام گلم پوینت"
-
-    # 6) بالای ۲۰۰۰۰۰ → کیک
-    elif TOP_WORD in text:
-        if current_total < TOP_THRESHOLD:
-            await message.reply_text(TOP_NOT_ALLOWED, parse_mode="HTML")
-            return
-        reward = TOP_POINT_REWARD
-        matched = True
-        emoji = "🍰"
-        point_name = "کیک پوینت"
-
-    if not matched:
-        return
-
-    can, remaining = can_claim(user.id, KIR_POINT_COOLDOWN)
-
-    if not can:
-        minutes = remaining // 60
-        seconds = remaining % 60
-        await message.reply_text(
-            f"⏳ <b>صبر کن</b> ⏳\n\n"
-            f"{emoji} <b>{point_name} هات :</b> {current_total}\n\n"
-            f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
-            parse_mode="HTML",
-        )
-        return
-
-    new_total = add_points(user.id, reward)
-
-    await message.reply_text(
-        f"{emoji} <b>{reward} {point_name} گرفتی</b> {emoji}\n\n"
-        f"💰 <b>{point_name} هات :</b> {new_total}\n\n"
-        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
-        parse_mode="HTML",
-    )
+    if message.chat.type not in (
