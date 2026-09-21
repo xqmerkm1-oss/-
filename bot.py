@@ -74,4 +74,8 @@ def main():
         )
     else:
         logger.info("✅ Starting polling (local mode)...")
-        app.run_poll
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
