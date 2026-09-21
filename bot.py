@@ -3,14 +3,14 @@ import logging
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
-    MessageHandler, filters, ChatMemberHandler,
+    MessageHandler, filters,
 )
 
 from config import BOT_TOKEN, KIR_WORD
 from database import init_db
 from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
-    welcome_to_group, kir_handler,
+    group_welcome, kir_handler,
 )
 
 # ===== لاگ =====
@@ -29,7 +29,7 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ===== هندلرهای خصوصی =====
+    # ===== هندلرهای چت خصوصی =====
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
@@ -38,16 +38,16 @@ def main():
         confirm_choice, pattern="^(confirm|cancel)_"
     ))
 
-    # ===== هندلرهای گروه =====
-    # خوشامد ربات وقتی به گروه اضافه میشه
+    # ===== هندلرهای گروه (توی همه گروه‌ها کار میکنن) =====
+    # خوشامد ربات وقتی به هر گروهی اضافه میشه
     app.add_handler(MessageHandler(
         filters.StatusUpdate.NEW_CHAT_MEMBERS,
-        welcome_to_group,
+        group_welcome,
     ))
 
-    # کیر پوینت — وقتی کسی «کیر» نوشت
+    # کیر پوینت — توی همه گروه‌ها
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(r"کیر"),
+        filters.TEXT & ~filters.COMMAND & filters.Regex(KIR_WORD),
         kir_handler,
     ))
 
