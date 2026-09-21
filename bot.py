@@ -3,11 +3,15 @@ import logging
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
+    MessageHandler, filters, ChatMemberHandler,
 )
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, KIR_WORD
 from database import init_db
-from handlers import start, check_join, gender_choice, confirm_choice, stats
+from handlers import (
+    start, check_join, gender_choice, confirm_choice, stats,
+    welcome_to_group, kir_handler,
+)
 
 # ===== لاگ =====
 logging.basicConfig(
@@ -25,12 +29,26 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # ===== هندلرهای خصوصی =====
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
     app.add_handler(CallbackQueryHandler(gender_choice, pattern="^gender_"))
     app.add_handler(CallbackQueryHandler(
         confirm_choice, pattern="^(confirm|cancel)_"
+    ))
+
+    # ===== هندلرهای گروه =====
+    # خوشامد ربات وقتی به گروه اضافه میشه
+    app.add_handler(MessageHandler(
+        filters.StatusUpdate.NEW_CHAT_MEMBERS,
+        welcome_to_group,
+    ))
+
+    # کیر پوینت — وقتی کسی «کیر» نوشت
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(r"کیر"),
+        kir_handler,
     ))
 
     if RAILWAY_DOMAIN:
