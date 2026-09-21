@@ -1,10 +1,14 @@
-from telegram import Update
+from telegram import Update, ChatMember
 from telegram.ext import ContextTypes
+from telegram.constants import ChatType
 
-from config import CHANNEL_ID
+from config import (
+    CHANNEL_ID, KIR_POINT_REWARD, KIR_POINT_COOLDOWN, KIR_WORD,
+)
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
     log_join_action, get_user, get_stats,
+    add_kir_points, can_claim_kir, get_kir_points,
 )
 from keyboards import join_keyboard, gender_keyboard, confirm_keyboard
 
@@ -28,7 +32,6 @@ JOINED_TEXT = (
     "حالا <b>جنسیتت</b> رو از دکمه های زیر انتخاب کن !"
 )
 
-# ===== متن دکمه‌های جنبه دارم =====
 MALE_HAVE_TEXT = (
     "🍌 <b>شنیدم دلت کیر میخواد</b> 🍌\n\n"
     "تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به گایی هات برای ایران 🤡\n\n"
@@ -56,7 +59,6 @@ FEMALE_HAVE_TEXT = (
     "کاملا رایگان بعضی وقتا پولی"
 )
 
-# ===== متن دکمه‌های جنبه ندارم =====
 MALE_DONT_TEXT = (
     "🌹 <b>سلام گل پسر</b> 🌹\n\n"
     "شنیدم که از این ربات ما <b>خوشت اومده</b> 😏\n\n"
@@ -72,17 +74,64 @@ FEMALE_DONT_TEXT = (
     "مثلا <b>امتیاز جمع کنی</b> به رفیقات <b>پز بدی</b> 💅"
 )
 
-# ===== متن‌های تأیید / انصراف =====
-CONFIRM_TEXT = "✅ <b>حله جنسیتت ثبت شد</b> 🎉"
+CONFIRM_TEXT = (
+    "✅ <b>حله جنسیتت ثبت شد</b> 🎉\n\n"
+    "حالا می‌تونی از ربات <b>استفاده کنی</b> 😎"
+)
 
 CANCEL_TEXT = (
     "🤨 <b>میدونستم داری کص میگی</b> 🤨\n\n"
     "دوباره برو <b>جنسیتت</b> رو تایید کن !"
 )
 
+# ===== متن‌های گروه =====
+GROUP_WELCOME_TEXT = (
+    "🎉 <b>کصخل خیز وارد گروه شده</b> 🍌\n\n"
+    "پاشید همگی <b>جق بزنید</b> 💦✊"
+)
+
+# ===== متن‌های کیر پوینت =====
+KIR_NOT_MALE_HAVE = (
+    "🚫 <b>تو اجازه نداری کیر پوینت بگیری</b> 🚫\n\n"
+    "فقط <b>پسرای با جنبه</b> می‌تونن کیر پوینت بگیرن !\n"
+    "اگه پسری و جنبه داری، برو توی ربات <b>جنسیتت</b> رو درست کن 😎"
+)
+
+KIR_NOT_STARTED = (
+    "❓ <b>اول برو توی ربات استارت بزن</b> ❓\n\n"
+    "باید اول توی ربات <b>/start</b> بزنی و <b>جنسیتت</b> رو انتخاب کنی !"
+)
+
+
+def format_kir_reply(earned: int, total: int, remaining: int = 0) -> str:
+    """ساخت متن پاسخ کیر پوینت"""
+    text = (
+        f"🍌 <b>{earned} کیر پوینت گرفتی</b> 🍌\n\n"
+        f"💦 <b>کیر پوینت هات :</b> {total}\n"
+    )
+    if remaining > 0:
+        minutes = remaining // 60
+        seconds = remaining % 60
+        text += f"\n⏳ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی کیر پوینت بگیری"
+    else:
+        text += f"\n✅ <b>می‌تونی دوباره کیر پوینت بگیری</b>"
+    return text
+
+
+def format_kir_cooldown(remaining: int, total: int) -> str:
+    """متن وقتی کاربر توی کول‌داونه"""
+    minutes = remaining // 60
+    seconds = remaining % 60
+    return (
+        f"⏳ <b>صبر کن جقی</b> ⏳\n\n"
+        f"💦 <b>کیر پوینت هات :</b> {total}\n\n"
+        f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری"
+    )
+
+
+# ===== توابع کمکی =====
 
 async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
-    """چک میکنه کاربر عضو کانال هست یا نه"""
     try:
         member = await context.bot.get_chat_member(
             chat_id=CHANNEL_ID, user_id=user_id
@@ -92,6 +141,13 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
         print(f"[is_member error] {e}")
         return False
 
+
+def is_male_have(user: dict) -> bool:
+    """آیا کاربر پسر با جنبه است؟"""
+    return user and user.get("gender") == "male_have"
+
+
+# ===== هندلرهای اصلی =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start - پیام خوشامد"""
@@ -119,7 +175,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }.get(db_user["gender"], db_user["gender"])
             await update.message.reply_text(
                 f"👋 <b>خوش برگشتی {user.first_name}</b>\n\n"
-                f"وضعیتت: {gender_label}",
+                f"وضعیتت: {label}",
                 parse_mode="HTML",
             )
             return
@@ -137,7 +193,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """کلیک روی دکمه «عضو شدم»"""
     query = update.callback_query
     user_id = query.from_user.id
     joined = await is_member(context, user_id)
@@ -176,7 +231,6 @@ async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """انتخاب جنسیت → نمایش متن + دکمه‌های تأیید"""
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data
@@ -193,11 +247,8 @@ async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     gender_value, response_text = mapping[data]
-
-    # ذخیره موقت جنسیت (هنوز تایید نشده)
     set_user_gender(user_id, gender_value)
 
-    # ویرایش پیام با متن + دکمه‌های تأیید
     try:
         await query.edit_message_text(
             response_text,
@@ -219,20 +270,18 @@ async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def confirm_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تأیید یا انصراف نهایی"""
     query = update.callback_query
     user_id = query.from_user.id
-    data = query.data  # مثل confirm_male_have یا cancel_male_have
+    data = query.data
 
     parts = data.split("_", 1)
     if len(parts) != 2:
         await query.answer()
         return
 
-    action, gender_value = parts  # action = confirm یا cancel
+    action, gender_value = parts
 
     if action == "confirm":
-        # کاربر تأیید کرد → ثبت نهایی
         set_user_gender(user_id, gender_value)
         try:
             await query.edit_message_text(
@@ -244,7 +293,6 @@ async def confirm_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("✅ ثبت شد")
 
     elif action == "cancel":
-        # کاربر انصراف داد → برگرد به دکمه‌های جنسیت
         try:
             await query.edit_message_text(
                 CANCEL_TEXT,
@@ -257,7 +305,6 @@ async def confirm_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/stats - آمار ربات"""
     s = get_stats()
     text = (
         "📊 <b>آمار ربات</b>\n\n"
@@ -267,3 +314,88 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👧 دختر: <b>{s['females']}</b>"
     )
     await update.message.reply_text(text, parse_mode="HTML")
+
+
+# ===== هندلرهای گروه =====
+
+async def welcome_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی ربات به گروه اضافه میشه"""
+    message = update.message
+    if not message:
+        return
+
+    # فقط وقتی ربات اضافه میشه
+    if message.new_chat_members:
+        for member in message.new_chat_members:
+            if member.id == context.bot.id:
+                await message.reply_text(
+                    GROUP_WELCOME_TEXT,
+                    parse_mode="HTML",
+                )
+                return
+
+
+async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی کسی توی گروه کلمه «کیر» رو نوشت"""
+    message = update.message
+    if not message or not message.text:
+        return
+
+    # فقط توی گروه‌ها
+    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    # فقط اگه دقیقاً کلمه کیر بود (نه توی جمله)
+    if KIR_WORD not in message.text.strip():
+        return
+
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+
+    # چک کن کاربر توی دیتابیس هست
+    db_user = get_user(user.id)
+
+    # اگه اصلاً استارت نزده
+    if not db_user:
+        await message.reply_text(
+            KIR_NOT_STARTED,
+            parse_mode="HTML",
+        )
+        return
+
+    # اگه جنسیت انتخاب نکرده
+    if not db_user.get("gender"):
+        await message.reply_text(
+            KIR_NOT_STARTED,
+            parse_mode="HTML",
+        )
+        return
+
+    # اگه پسر با جنبه نیست
+    if not is_male_have(db_user):
+        await message.reply_text(
+            KIR_NOT_MALE_HAVE,
+            parse_mode="HTML",
+        )
+        return
+
+    # چک کول‌داون
+    can_claim, remaining = can_claim_kir(user.id, KIR_POINT_COOLDOWN)
+    info = get_kir_points(user.id)
+    current_total = info["points"] if info else 0
+
+    if not can_claim:
+        await message.reply_text(
+            format_kir_cooldown(remaining, current_total),
+            parse_mode="HTML",
+        )
+        return
+
+    # اضافه کردن امتیاز
+    new_total = add_kir_points(user.id, KIR_POINT_REWARD)
+
+    await message.reply_text(
+        format_kir_reply(KIR_POINT_REWARD, new_total, KIR_POINT_COOLDOWN),
+        parse_mode="HTML",
+    )
