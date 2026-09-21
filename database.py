@@ -13,11 +13,10 @@ def get_connection():
 
 
 def init_db():
-    """ساخت جدولها اگه وجود نداشته باشن"""
+    """ساخت جدول‌ها"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # جدول کاربران
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id      INTEGER PRIMARY KEY,
@@ -32,7 +31,6 @@ def init_db():
         )
     """)
 
-    # جدول لاگ عضویت (برای بررسی تاریخچه)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS join_logs (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,10 +122,10 @@ def get_stats():
     cursor.execute("SELECT COUNT(*) AS joined FROM users WHERE is_joined = 1")
     joined = cursor.fetchone()["joined"]
 
-    cursor.execute("SELECT COUNT(*) AS males FROM users WHERE gender = 'male'")
+    cursor.execute("SELECT COUNT(*) AS males FROM users WHERE gender LIKE 'male_%'")
     males = cursor.fetchone()["males"]
 
-    cursor.execute("SELECT COUNT(*) AS females FROM users WHERE gender = 'female'")
+    cursor.execute("SELECT COUNT(*) AS females FROM users WHERE gender LIKE 'female_%'")
     females = cursor.fetchone()["females"]
 
     conn.close()
