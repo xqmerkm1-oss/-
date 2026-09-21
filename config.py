@@ -13,3 +13,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN") or DEFAULT_BOT_TOKEN
 CHANNEL_ID = int(os.getenv("CHANNEL_ID") or DEFAULT_CHANNEL_ID)
 CHANNEL_LINK = os.getenv("CHANNEL_LINK") or DEFAULT_CHANNEL_LINK
 DATABASE_PATH = os.getenv("DATABASE_PATH") or DEFAULT_DATABASE_PATH
+
+# ===== کیر پوینت =====
+KIR_POINT_REWARD = 5          # امتیاز هر بار
+KIR_POINT_COOLDOWN = 180      # ثانیه (۳ دقیقه)
+KIR_WORD = "کیر"              # کلمهای که امتیاز میده
