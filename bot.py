@@ -53,13 +53,8 @@ def main():
         group_welcome,
     ))
 
-    # راهنما (کلمه «راهنما»)
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex("راهنما"),
-        rahnama_handler,
-    ))
-
-    # ===== کلمات پوینت (فقط تک‌کلمه‌ای) =====
+    # ===== الگوهای Regex =====
+    # کلمات پوینت (فقط تک‌کلمه‌ای)
     single_words_pattern = (
         r"^\s*("
         + KIR_WORD + "|"
@@ -71,20 +66,46 @@ def main():
         + r")\s*$"
     )
 
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(single_words_pattern),
-        points_handler,
-    ))
-
-    # ===== دستورات نمایش پوینت (کیرام / کصام / پوینتام) =====
+    # نمایش پوینت (کیرام / کصام / پوینتام)
     my_points_pattern = (
         r"^\s*(کیرام|کیرهام|کیر هام|کیرها|"
         r"کصام|کصهام|کص هام|کصها|"
         r"پوینتام|پوینتهام|پوینت هام|پوینتها)\s*$"
     )
 
+    # ===== راهنما (کلمه «راهنما») =====
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex("راهنما"),
+        rahnama_handler,
+    ))
+
+    # ===== کلمات پوینت =====
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(single_words_pattern),
+        points_handler,
+    ))
+
+    # ===== نمایش پوینت =====
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(my_points_pattern),
+        my_points_handler,
+    ))
+
+    # ===== پیام‌های ویرایش‌شده (کلمات پوینت) =====
+    app.add_handler(MessageHandler(
+        filters.UpdateType.EDITED_MESSAGE
+        & filters.TEXT
+        & ~filters.COMMAND
+        & filters.Regex(single_words_pattern),
+        points_handler,
+    ))
+
+    # ===== پیام‌های ویرایش‌شده (نمایش پوینت) =====
+    app.add_handler(MessageHandler(
+        filters.UpdateType.EDITED_MESSAGE
+        & filters.TEXT
+        & ~filters.COMMAND
+        & filters.Regex(my_points_pattern),
         my_points_handler,
     ))
 
