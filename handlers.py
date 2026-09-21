@@ -9,7 +9,7 @@ from database import (
 from keyboards import join_keyboard, gender_keyboard
 
 
-# ===== متن‌ها (بولد + ایموجی) =====
+# ===== متنها (بولد + ایموجی) =====
 WELCOME_TEXT = (
     "🎉 <b>به ربات کصخل خیز خوش اومدین</b> 🎉\n\n"
     "📌 برای استفاده از ربات ابتدا باید عضو کانال "
