@@ -13,7 +13,7 @@ def get_connection():
 
 
 def init_db():
-    """ساخت جدولها"""
+    """ساخت جدول‌ها"""
     conn = get_connection()
     cursor = conn.cursor()
 
