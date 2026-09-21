@@ -33,7 +33,7 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ===== دستورات اسلش (فقط چت خصوصی) =====
+    # ===== دستورات اسلش =====
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("mypoints", my_points))
     app.add_handler(CommandHandler("stats", stats))
@@ -58,7 +58,7 @@ def main():
         rahnama_handler,
     ))
 
-    # کلمات امتیاز
+    # کلمات پوینت
     all_words_pattern = "|".join([
         KIR_WORD, KOS_WORD,
         MALE_GOOD_WORD, FEMALE_GOOD_WORD,
