@@ -6,11 +6,16 @@ from telegram.ext import (
     MessageHandler, filters,
 )
 
-from config import BOT_TOKEN, KIR_WORD, KOS_WORD
+from config import (
+    BOT_TOKEN,
+    KIR_WORD, KOS_WORD, MALE_GOOD_WORD, FEMALE_GOOD_WORD,
+    HIGH_WORD, TOP_WORD,
+)
 from database import init_db
 from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
-    group_welcome, kir_handler, kos_handler,
+    help_command, my_points,
+    group_welcome, points_handler,
 )
 
 logging.basicConfig(
@@ -30,7 +35,10 @@ def main():
 
     # ===== چت خصوصی =====
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("mypoints", my_points))
     app.add_handler(CommandHandler("stats", stats))
+
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
     app.add_handler(CallbackQueryHandler(gender_choice, pattern="^gender_"))
     app.add_handler(CallbackQueryHandler(
@@ -43,16 +51,16 @@ def main():
         group_welcome,
     ))
 
-    # کیر پوینت (اولویت بالاتر)
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(KIR_WORD),
-        kir_handler,
-    ))
+    # ===== کلمات کلیدی (همه توی یه هندلر) =====
+    all_words_pattern = "|".join([
+        KIR_WORD, KOS_WORD,
+        MALE_GOOD_WORD, FEMALE_GOOD_WORD,
+        HIGH_WORD, TOP_WORD,
+    ])
 
-    # کص پوینت
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(KOS_WORD),
-        kos_handler,
+        filters.TEXT & ~filters.COMMAND & filters.Regex(all_words_pattern),
+        points_handler,
     ))
 
     if RAILWAY_DOMAIN:
@@ -66,8 +74,4 @@ def main():
         )
     else:
         logger.info("✅ Starting polling (local mode)...")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == "__main__":
-    main()
+        app.run_poll
