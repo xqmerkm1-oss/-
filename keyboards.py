@@ -2,28 +2,28 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import CHANNEL_LINK, ADD_TO_GROUP_LINK
 
 
-def start_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های پیام خوشامد (کانال + افزودن به گروه)"""
+def joined_keyboard() -> InlineKeyboardMarkup:
+    """دکمه‌های پیام بعد از تأیید جنسیت"""
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "📢 کانال کصخل خیز",
-                url=CHANNEL_LINK,
-                api_kwargs={"style": "primary"},  # 🔵 آبی
-            ),
-        ],
         [
             InlineKeyboardButton(
                 "➕ افزودن ربات به گروه",
                 url=ADD_TO_GROUP_LINK,
-                api_kwargs={"style": "success"},  # 🟢 سبز
+                api_kwargs={"style": "success"},
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "📖 راهنما",
+                callback_data="show_help",
+                api_kwargs={"style": "primary"},
             ),
         ],
     ])
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های عضویت در کانال + تایید (رنگی)"""
+    """دکمه‌های عضویت در کانال + تایید"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -41,7 +41,7 @@ def join_keyboard() -> InlineKeyboardMarkup:
 
 
 def gender_keyboard() -> InlineKeyboardMarkup:
-    """۴ دکمه انتخاب جنسیت + جنبه (سبز/قرمز)"""
+    """۴ دکمه انتخاب جنسیت + جنبه"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -71,7 +71,7 @@ def gender_keyboard() -> InlineKeyboardMarkup:
 
 
 def confirm_keyboard(gender_value: str) -> InlineKeyboardMarkup:
-    """دکمه‌های تأیید نهایی — «مطمئنم» و «مطمئن نیستم»"""
+    """دکمه‌های تأیید نهایی"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -89,13 +89,9 @@ def confirm_keyboard(gender_value: str) -> InlineKeyboardMarkup:
 
 
 def help_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
-    """
-    کیبورد راهنما — شخصی‌سازی شده بر اساس جنسیت
-    فقط دکمه‌های مربوط به جنسیت خود کاربر
-    """
+    """کیبورد راهنما — شخصی‌سازی شده"""
     rows = []
 
-    # دکمه اصلی جنسیت کاربر
     if gender == "male_have":
         rows.append([
             InlineKeyboardButton(
@@ -129,7 +125,6 @@ def help_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
             ),
         ])
 
-    # دکمه توضیحات بلند (برای همه)
     rows.append([
         InlineKeyboardButton(
             "📖 توضیحات بلند",
@@ -138,7 +133,6 @@ def help_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
         ),
     ])
 
-    # دکمه پوینت من
     rows.append([
         InlineKeyboardButton(
             "💰 پوینت من",
@@ -151,7 +145,7 @@ def help_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
 
 
 def help_back_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
-    """دکمه برگشت به راهنما + توضیحات بلند"""
+    """دکمه برگشت به راهنما"""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -165,4 +159,24 @@ def help_back_keyboard(user_id: int, gender: str) -> InlineKeyboardMarkup:
                 api_kwargs={"style": "success"},
             ),
         ]
+    ])
+
+
+def inactive_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """دکمه‌های یادآوری عدم فعالیت"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "💪 فعالیت می‌کنم",
+                callback_data=f"inactive_stay_{user_id}",
+                api_kwargs={"style": "success"},
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🚶 سیکتیر بابا",
+                callback_data=f"inactive_leave_{user_id}",
+                api_kwargs={"style": "danger"},
+            ),
+        ],
     ])
