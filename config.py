@@ -16,11 +16,11 @@ CHANNEL_LINK = os.getenv("CHANNEL_LINK") or DEFAULT_CHANNEL_LINK
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # ===== امتیازها =====
-KIR_POINT_REWARD = 5          # پسر با جنبه — کیر
-KOS_POINT_REWARD = 5          # دختر با جنبه — کص
-WEAK_POINT_REWARD = 1         # بی‌جنبه‌ها — پسر خوب / دختر خوب
-HIGH_POINT_REWARD = 1         # بالای ۵۰۰۰۰ — سلام گلم
-TOP_POINT_REWARD = 1          # بالای ۲۰۰۰۰۰ — کیک
+KIR_POINT_REWARD = 5
+KOS_POINT_REWARD = 5
+WEAK_POINT_REWARD = 1
+HIGH_POINT_REWARD = 1
+TOP_POINT_REWARD = 1
 
 KIR_POINT_COOLDOWN = 180      # ۳ دقیقه
 
