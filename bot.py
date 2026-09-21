@@ -6,14 +6,13 @@ from telegram.ext import (
     MessageHandler, filters,
 )
 
-from config import BOT_TOKEN, KIR_WORD
+from config import BOT_TOKEN, KIR_WORD, KOS_WORD
 from database import init_db
 from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
-    group_welcome, kir_handler,
+    group_welcome, kir_handler, kos_handler,
 )
 
-# ===== لاگ =====
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -29,7 +28,7 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ===== هندلرهای چت خصوصی =====
+    # ===== چت خصوصی =====
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
@@ -38,17 +37,22 @@ def main():
         confirm_choice, pattern="^(confirm|cancel)_"
     ))
 
-    # ===== هندلرهای گروه (توی همه گروه‌ها کار میکنن) =====
-    # خوشامد ربات وقتی به هر گروهی اضافه میشه
+    # ===== گروه =====
     app.add_handler(MessageHandler(
         filters.StatusUpdate.NEW_CHAT_MEMBERS,
         group_welcome,
     ))
 
-    # کیر پوینت — توی همه گروه‌ها
+    # کیر پوینت (اولویت بالاتر)
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(KIR_WORD),
         kir_handler,
+    ))
+
+    # کص پوینت
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(KOS_WORD),
+        kos_handler,
     ))
 
     if RAILWAY_DOMAIN:
