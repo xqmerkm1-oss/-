@@ -11,20 +11,16 @@ def get_connection():
             "DATABASE_URL تنظیم نشده! برو توی Railway → Variables → "
             "DATABASE_URL رو با Reference از Postgres ست کن."
         )
-
     url = DATABASE_URL
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-
-    conn = psycopg2.connect(url)
-    return conn
+    return psycopg2.connect(url)
 
 
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # جدول کاربران
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id      BIGINT PRIMARY KEY,
@@ -39,7 +35,6 @@ def init_db():
         )
     """)
 
-    # جدول لاگ عضویت
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS join_logs (
             id         SERIAL PRIMARY KEY,
@@ -49,20 +44,9 @@ def init_db():
         )
     """)
 
-    # جدول کیر پوینت
+    # ===== جدول امتیازها (یکپارچه برای همه) =====
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS kir_points (
-            user_id        BIGINT PRIMARY KEY,
-            points         INTEGER DEFAULT 0,
-            last_claimed   TEXT,
-            total_claimed  INTEGER DEFAULT 0,
-            updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # جدول کص پوینت
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS kos_points (
+        CREATE TABLE IF NOT EXISTS points (
             user_id        BIGINT PRIMARY KEY,
             points         INTEGER DEFAULT 0,
             last_claimed   TEXT,
@@ -75,8 +59,6 @@ def init_db():
     cursor.close()
     conn.close()
 
-
-# ===== کاربران =====
 
 def get_user(user_id: int):
     conn = get_connection()
@@ -171,95 +153,45 @@ def get_stats():
     }
 
 
-# ===== کیر پوینت =====
+# ===== امتیازها (یکپارچه) =====
 
-def get_kir_points(user_id: int):
+def get_points(user_id: int):
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM kir_points WHERE user_id = %s", (user_id,))
+    cursor.execute("SELECT * FROM points WHERE user_id = %s", (user_id,))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
     return dict(row) if row else None
 
 
-def add_kir_points(user_id: int, amount: int) -> int:
+def add_points(user_id: int, amount: int) -> int:
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     now = datetime.now().isoformat()
 
     cursor.execute("""
-        INSERT INTO kir_points (user_id, points, last_claimed, total_claimed)
+        INSERT INTO points (user_id, points, last_claimed, total_claimed)
         VALUES (%s, %s, %s, %s)
         ON CONFLICT(user_id) DO UPDATE SET
-            points        = kir_points.points + EXCLUDED.points,
-            total_claimed = kir_points.total_claimed + EXCLUDED.total_claimed,
+            points        = points.points + EXCLUDED.points,
+            total_claimed = points.total_claimed + EXCLUDED.total_claimed,
             last_claimed  = EXCLUDED.last_claimed,
             updated_at    = CURRENT_TIMESTAMP
     """, (user_id, amount, now, amount))
 
     conn.commit()
 
-    cursor.execute("SELECT points FROM kir_points WHERE user_id = %s", (user_id,))
+    cursor.execute("SELECT points FROM points WHERE user_id = %s", (user_id,))
     new_total = cursor.fetchone()["points"]
     cursor.close()
     conn.close()
     return new_total
 
 
-def can_claim_kir(user_id: int, cooldown_seconds: int):
-    info = get_kir_points(user_id)
-
-    if not info or not info.get("last_claimed"):
-        return True, 0
-
-    last = datetime.fromisoformat(info["last_claimed"])
-    elapsed = (datetime.now() - last).total_seconds()
-
-    if elapsed >= cooldown_seconds:
-        return True, 0
-
-    return False, int(cooldown_seconds - elapsed)
-
-
-# ===== کص پوینت =====
-
-def get_kos_points(user_id: int):
-    conn = get_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM kos_points WHERE user_id = %s", (user_id,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return dict(row) if row else None
-
-
-def add_kos_points(user_id: int, amount: int) -> int:
-    conn = get_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    now = datetime.now().isoformat()
-
-    cursor.execute("""
-        INSERT INTO kos_points (user_id, points, last_claimed, total_claimed)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT(user_id) DO UPDATE SET
-            points        = kos_points.points + EXCLUDED.points,
-            total_claimed = kos_points.total_claimed + EXCLUDED.total_claimed,
-            last_claimed  = EXCLUDED.last_claimed,
-            updated_at    = CURRENT_TIMESTAMP
-    """, (user_id, amount, now, amount))
-
-    conn.commit()
-
-    cursor.execute("SELECT points FROM kos_points WHERE user_id = %s", (user_id,))
-    new_total = cursor.fetchone()["points"]
-    cursor.close()
-    conn.close()
-    return new_total
-
-
-def can_claim_kos(user_id: int, cooldown_seconds: int):
-    info = get_kos_points(user_id)
+def can_claim(user_id: int, cooldown_seconds: int):
+    """Returns: (can_claim: bool, remaining_seconds: int)"""
+    info = get_points(user_id)
 
     if not info or not info.get("last_claimed"):
         return True, 0
