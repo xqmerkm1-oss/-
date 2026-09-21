@@ -15,7 +15,7 @@ CHANNEL_LINK = os.getenv("CHANNEL_LINK") or DEFAULT_CHANNEL_LINK
 # ===== دیتابیس Postgres =====
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ===== امتیازها =====
+# ===== پوینت‌ها =====
 KIR_POINT_REWARD = 5
 KOS_POINT_REWARD = 5
 WEAK_POINT_REWARD = 1
@@ -35,3 +35,6 @@ TOP_WORD = "کیک"
 # ===== آستانه‌ها =====
 HIGH_THRESHOLD = 50000
 TOP_THRESHOLD = 200000
+
+# ===== زمان انقضای راهنما (ثانیه) =====
+HELP_EXPIRE_SECONDS = 300     # ۵ دقیقه
