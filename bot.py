@@ -14,7 +14,7 @@ from config import (
 from database import init_db
 from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
-    my_points,
+    my_points, my_points_handler,
     group_welcome, rahnama_handler, help_callback, points_handler,
     auto_close_help_panel,
 )
@@ -74,6 +74,18 @@ def main():
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(single_words_pattern),
         points_handler,
+    ))
+
+    # ===== دستورات نمایش پوینت (کیرام / کصام / پوینتام) =====
+    my_points_pattern = (
+        r"^\s*(کیرام|کیرهام|کیر هام|کیرها|"
+        r"کصام|کصهام|کص هام|کصها|"
+        r"پوینتام|پوینتهام|پوینت هام|پوینتها)\s*$"
+    )
+
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(my_points_pattern),
+        my_points_handler,
     ))
 
     # ===== تایمر بستن خودکار پنل راهنما =====
