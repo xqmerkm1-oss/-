@@ -1,63 +1,69 @@
-import sqlite3
 import os
-from datetime import datetime, timedelta
-from config import DATABASE_PATH
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import datetime
+from config import DATABASE_URL
 
 
 def get_connection():
-    os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
+    """اتصال به دیتابیس Postgres"""
+    # Railway از URL خاصی استفاده میکنه
+    url = DATABASE_URL
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    conn = psycopg2.connect(url)
     return conn
 
 
 def init_db():
+    """ساخت جدولها"""
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id      INTEGER PRIMARY KEY,
+            user_id      BIGINT PRIMARY KEY,
             username     TEXT,
             first_name   TEXT,
             last_name    TEXT,
             gender       TEXT,
             is_joined    INTEGER DEFAULT 0,
             joined_at    TEXT,
-            created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at   TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS join_logs (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER,
+            id         SERIAL PRIMARY KEY,
+            user_id    BIGINT,
             action     TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # ===== جدول کیر پوینت =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kir_points (
-            user_id        INTEGER PRIMARY KEY,
+            user_id        BIGINT PRIMARY KEY,
             points         INTEGER DEFAULT 0,
             last_claimed   TEXT,
             total_claimed  INTEGER DEFAULT 0,
-            updated_at     TEXT DEFAULT CURRENT_TIMESTAMP
+            updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     conn.commit()
+    cursor.close()
     conn.close()
 
 
 def get_user(user_id: int):
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return dict(row) if row else None
 
@@ -68,14 +74,15 @@ def create_or_update_user(user_id: int, username: str = None,
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO users (user_id, username, first_name, last_name)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT(user_id) DO UPDATE SET
-            username   = excluded.username,
-            first_name = excluded.first_name,
-            last_name  = excluded.last_name,
+            username   = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name  = EXCLUDED.last_name,
             updated_at = CURRENT_TIMESTAMP
     """, (user_id, username, first_name, last_name))
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -85,11 +92,12 @@ def set_user_joined(user_id: int, joined: bool):
     now = datetime.now().isoformat() if joined else None
     cursor.execute("""
         UPDATE users
-        SET is_joined = ?, joined_at = COALESCE(?, joined_at),
+        SET is_joined = %s, joined_at = COALESCE(%s, joined_at),
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ?
+        WHERE user_id = %s
     """, (1 if joined else 0, now, user_id))
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -98,10 +106,11 @@ def set_user_gender(user_id: int, gender: str):
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE users
-        SET gender = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ?
+        SET gender = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = %s
     """, (gender, user_id))
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -109,16 +118,17 @@ def log_join_action(user_id: int, action: str):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO join_logs (user_id, action) VALUES (?, ?)",
+        "INSERT INTO join_logs (user_id, action) VALUES (%s, %s)",
         (user_id, action),
     )
     conn.commit()
+    cursor.close()
     conn.close()
 
 
 def get_stats():
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT COUNT(*) AS total FROM users")
     total = cursor.fetchone()["total"]
 
@@ -131,6 +141,7 @@ def get_stats():
     cursor.execute("SELECT COUNT(*) AS females FROM users WHERE gender LIKE 'female_%'")
     females = cursor.fetchone()["females"]
 
+    cursor.close()
     conn.close()
     return {
         "total": total,
@@ -143,45 +154,40 @@ def get_stats():
 # ===== کیر پوینت =====
 
 def get_kir_points(user_id: int):
-    """گرفتن اطلاعات کیر پوینت کاربر"""
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM kir_points WHERE user_id = ?", (user_id,))
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM kir_points WHERE user_id = %s", (user_id,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return dict(row) if row else None
 
 
 def add_kir_points(user_id: int, amount: int) -> int:
-    """اضافه کردن امتیاز و برگردوندن مجموع جدید"""
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     now = datetime.now().isoformat()
 
-    # ساخت رکورد اگه وجود نداره
     cursor.execute("""
         INSERT INTO kir_points (user_id, points, last_claimed, total_claimed)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT(user_id) DO UPDATE SET
-            points        = kir_points.points + excluded.points,
-            total_claimed = kir_points.total_claimed + excluded.total_claimed,
-            last_claimed  = excluded.last_claimed,
+            points        = kir_points.points + EXCLUDED.points,
+            total_claimed = kir_points.total_claimed + EXCLUDED.total_claimed,
+            last_claimed  = EXCLUDED.last_claimed,
             updated_at    = CURRENT_TIMESTAMP
     """, (user_id, amount, now, amount))
 
     conn.commit()
 
-    cursor.execute("SELECT points FROM kir_points WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT points FROM kir_points WHERE user_id = %s", (user_id,))
     new_total = cursor.fetchone()["points"]
+    cursor.close()
     conn.close()
     return new_total
 
 
 def can_claim_kir(user_id: int, cooldown_seconds: int):
-    """
-    چک میکنه کاربر میتونه امتیاز بگیره یا نه
-    Returns: (can_claim: bool, remaining_seconds: int)
-    """
     info = get_kir_points(user_id)
 
     if not info or not info.get("last_claimed"):
