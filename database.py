@@ -6,7 +6,6 @@ from config import DATABASE_URL
 
 
 def get_connection():
-    """اتصال به دیتابیس Postgres"""
     if not DATABASE_URL:
         raise ValueError(
             "DATABASE_URL تنظیم نشده! برو توی Railway → Variables → "
@@ -14,7 +13,6 @@ def get_connection():
         )
 
     url = DATABASE_URL
-    # Railway از postgres:// استفاده میکنه ولی psycopg2 نیاز به postgresql:// داره
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
 
@@ -23,10 +21,10 @@ def get_connection():
 
 
 def init_db():
-    """ساخت جدول‌ها"""
     conn = get_connection()
     cursor = conn.cursor()
 
+    # جدول کاربران
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id      BIGINT PRIMARY KEY,
@@ -41,6 +39,7 @@ def init_db():
         )
     """)
 
+    # جدول لاگ عضویت
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS join_logs (
             id         SERIAL PRIMARY KEY,
@@ -50,8 +49,20 @@ def init_db():
         )
     """)
 
+    # جدول کیر پوینت
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kir_points (
+            user_id        BIGINT PRIMARY KEY,
+            points         INTEGER DEFAULT 0,
+            last_claimed   TEXT,
+            total_claimed  INTEGER DEFAULT 0,
+            updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # جدول کص پوینت
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS kos_points (
             user_id        BIGINT PRIMARY KEY,
             points         INTEGER DEFAULT 0,
             last_claimed   TEXT,
@@ -64,6 +75,8 @@ def init_db():
     cursor.close()
     conn.close()
 
+
+# ===== کاربران =====
 
 def get_user(user_id: int):
     conn = get_connection()
@@ -195,8 +208,58 @@ def add_kir_points(user_id: int, amount: int) -> int:
 
 
 def can_claim_kir(user_id: int, cooldown_seconds: int):
-    """Returns: (can_claim: bool, remaining_seconds: int)"""
     info = get_kir_points(user_id)
+
+    if not info or not info.get("last_claimed"):
+        return True, 0
+
+    last = datetime.fromisoformat(info["last_claimed"])
+    elapsed = (datetime.now() - last).total_seconds()
+
+    if elapsed >= cooldown_seconds:
+        return True, 0
+
+    return False, int(cooldown_seconds - elapsed)
+
+
+# ===== کص پوینت =====
+
+def get_kos_points(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM kos_points WHERE user_id = %s", (user_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_kos_points(user_id: int, amount: int) -> int:
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    now = datetime.now().isoformat()
+
+    cursor.execute("""
+        INSERT INTO kos_points (user_id, points, last_claimed, total_claimed)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT(user_id) DO UPDATE SET
+            points        = kos_points.points + EXCLUDED.points,
+            total_claimed = kos_points.total_claimed + EXCLUDED.total_claimed,
+            last_claimed  = EXCLUDED.last_claimed,
+            updated_at    = CURRENT_TIMESTAMP
+    """, (user_id, amount, now, amount))
+
+    conn.commit()
+
+    cursor.execute("SELECT points FROM kos_points WHERE user_id = %s", (user_id,))
+    new_total = cursor.fetchone()["points"]
+    cursor.close()
+    conn.close()
+    return new_total
+
+
+def can_claim_kos(user_id: int, cooldown_seconds: int):
+    info = get_kos_points(user_id)
 
     if not info or not info.get("last_claimed"):
         return True, 0
