@@ -1,4 +1,4 @@
-from telegram import Update, ChatMember
+from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 
@@ -90,7 +90,14 @@ GROUP_WELCOME_TEXT = (
     "پاشید همگی <b>جق بزنید</b> 💦✊"
 )
 
-# ===== متن‌های کیر پوینت =====
+GROUP_HELP_TEXT = (
+    "📌 <b>راهنمای ربات:</b>\n\n"
+    "برای گرفتن <b>کیر پوینت</b> کافیه کلمه <b>کیر</b> رو بنویسی 😎\n\n"
+    "⚠️ فقط <b>پسرای با جنبه</b> می‌تونن امتیاز بگیرن!\n"
+    "اگه توی ربات <b>/start</b> نزدی یا جنسیتت رو انتخاب نکردی، اول برو توی ربات !\n\n"
+    "⏳ هر <b>۳ دقیقه</b> یه بار می‌تونی امتیاز بگیری"
+)
+
 KIR_NOT_MALE_HAVE = (
     "🚫 <b>تو اجازه نداری کیر پوینت بگیری</b> 🚫\n\n"
     "فقط <b>پسرای با جنبه</b> می‌تونن کیر پوینت بگیرن !\n"
@@ -101,32 +108,6 @@ KIR_NOT_STARTED = (
     "❓ <b>اول برو توی ربات استارت بزن</b> ❓\n\n"
     "باید اول توی ربات <b>/start</b> بزنی و <b>جنسیتت</b> رو انتخاب کنی !"
 )
-
-
-def format_kir_reply(earned: int, total: int, remaining: int = 0) -> str:
-    """ساخت متن پاسخ کیر پوینت"""
-    text = (
-        f"🍌 <b>{earned} کیر پوینت گرفتی</b> 🍌\n\n"
-        f"💦 <b>کیر پوینت هات :</b> {total}\n"
-    )
-    if remaining > 0:
-        minutes = remaining // 60
-        seconds = remaining % 60
-        text += f"\n⏳ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی کیر پوینت بگیری"
-    else:
-        text += f"\n✅ <b>می‌تونی دوباره کیر پوینت بگیری</b>"
-    return text
-
-
-def format_kir_cooldown(remaining: int, total: int) -> str:
-    """متن وقتی کاربر توی کول‌داونه"""
-    minutes = remaining // 60
-    seconds = remaining % 60
-    return (
-        f"⏳ <b>صبر کن جقی</b> ⏳\n\n"
-        f"💦 <b>کیر پوینت هات :</b> {total}\n\n"
-        f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری"
-    )
 
 
 # ===== توابع کمکی =====
@@ -143,11 +124,10 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
 
 
 def is_male_have(user: dict) -> bool:
-    """آیا کاربر پسر با جنبه است؟"""
     return user and user.get("gender") == "male_have"
 
 
-# ===== هندلرهای اصلی =====
+# ===== هندلرهای خصوصی =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start - پیام خوشامد"""
@@ -175,7 +155,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }.get(db_user["gender"], db_user["gender"])
             await update.message.reply_text(
                 f"👋 <b>خوش برگشتی {user.first_name}</b>\n\n"
-                f"وضعیتت: {label}",
+                f"وضعیتت: {gender_label}",
                 parse_mode="HTML",
             )
             return
@@ -318,25 +298,27 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== هندلرهای گروه =====
 
-async def welcome_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی ربات به گروه اضافه میشه"""
+async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی ربات به هر گروهی اضافه میشه"""
     message = update.message
-    if not message:
+    if not message or not message.new_chat_members:
         return
 
-    # فقط وقتی ربات اضافه میشه
-    if message.new_chat_members:
-        for member in message.new_chat_members:
-            if member.id == context.bot.id:
-                await message.reply_text(
-                    GROUP_WELCOME_TEXT,
-                    parse_mode="HTML",
-                )
-                return
+    for member in message.new_chat_members:
+        if member.id == context.bot.id:
+            await message.reply_text(
+                GROUP_WELCOME_TEXT,
+                parse_mode="HTML",
+            )
+            await message.reply_text(
+                GROUP_HELP_TEXT,
+                parse_mode="HTML",
+            )
+            return
 
 
 async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی کسی توی گروه کلمه «کیر» رو نوشت"""
+    """وقتی کسی توی هر گروهی کلمه «کیر» رو نوشت"""
     message = update.message
     if not message or not message.text:
         return
@@ -345,39 +327,29 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
         return
 
-    # فقط اگه دقیقاً کلمه کیر بود (نه توی جمله)
-    if KIR_WORD not in message.text.strip():
+    # چک کلمه کیر
+    if KIR_WORD not in message.text:
         return
 
     user = message.from_user
     if not user or user.is_bot:
         return
 
-    # چک کن کاربر توی دیتابیس هست
     db_user = get_user(user.id)
 
     # اگه اصلاً استارت نزده
     if not db_user:
-        await message.reply_text(
-            KIR_NOT_STARTED,
-            parse_mode="HTML",
-        )
+        await message.reply_text(KIR_NOT_STARTED, parse_mode="HTML")
         return
 
     # اگه جنسیت انتخاب نکرده
     if not db_user.get("gender"):
-        await message.reply_text(
-            KIR_NOT_STARTED,
-            parse_mode="HTML",
-        )
+        await message.reply_text(KIR_NOT_STARTED, parse_mode="HTML")
         return
 
     # اگه پسر با جنبه نیست
     if not is_male_have(db_user):
-        await message.reply_text(
-            KIR_NOT_MALE_HAVE,
-            parse_mode="HTML",
-        )
+        await message.reply_text(KIR_NOT_MALE_HAVE, parse_mode="HTML")
         return
 
     # چک کول‌داون
@@ -386,8 +358,12 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_total = info["points"] if info else 0
 
     if not can_claim:
+        minutes = remaining // 60
+        seconds = remaining % 60
         await message.reply_text(
-            format_kir_cooldown(remaining, current_total),
+            f"⏳ <b>صبر کن جقی</b> ⏳\n\n"
+            f"💦 <b>کیر پوینت هات :</b> {current_total}\n\n"
+            f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
             parse_mode="HTML",
         )
         return
@@ -396,6 +372,8 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_total = add_kir_points(user.id, KIR_POINT_REWARD)
 
     await message.reply_text(
-        format_kir_reply(KIR_POINT_REWARD, new_total, KIR_POINT_COOLDOWN),
+        f"🍌 <b>{KIR_POINT_REWARD} کیر پوینت گرفتی</b> 🍌\n\n"
+        f"💦 <b>کیر پوینت هات :</b> {new_total}\n\n"
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
