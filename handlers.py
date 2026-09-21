@@ -3,12 +3,15 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 
 from config import (
-    CHANNEL_ID, KIR_POINT_REWARD, KIR_POINT_COOLDOWN, KIR_WORD,
+    CHANNEL_ID,
+    KIR_POINT_REWARD, KIR_POINT_COOLDOWN, KIR_WORD,
+    KOS_POINT_REWARD, KOS_POINT_COOLDOWN, KOS_WORD,
 )
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
     log_join_action, get_user, get_stats,
     add_kir_points, can_claim_kir, get_kir_points,
+    add_kos_points, can_claim_kos, get_kos_points,
 )
 from keyboards import join_keyboard, gender_keyboard, confirm_keyboard
 
@@ -92,19 +95,29 @@ GROUP_WELCOME_TEXT = (
 
 GROUP_HELP_TEXT = (
     "📌 <b>راهنمای ربات:</b>\n\n"
-    "برای گرفتن <b>کیر پوینت</b> کافیه کلمه <b>کیر</b> رو بنویسی 😎\n\n"
-    "⚠️ فقط <b>پسرای با جنبه</b> می‌تونن امتیاز بگیرن!\n"
+    "👦 <b>پسرا:</b> کلمه <b>کیر</b> رو بنویسن تا <b>کیر پوینت</b> بگیرن 🍌\n\n"
+    "👧 <b>دخترا:</b> کلمه <b>کص</b> رو بنویسن تا <b>کص پوینت</b> بگیرن 🍑\n\n"
+    "⚠️ فقط <b>پسرای با جنبه</b> و <b>دخترای با جنبه</b> می‌تونن امتیاز بگیرن !\n"
     "اگه توی ربات <b>/start</b> نزدی یا جنسیتت رو انتخاب نکردی، اول برو توی ربات !\n\n"
     "⏳ هر <b>۳ دقیقه</b> یه بار می‌تونی امتیاز بگیری"
 )
 
+# ===== کیر پوینت =====
 KIR_NOT_MALE_HAVE = (
     "🚫 <b>تو اجازه نداری کیر پوینت بگیری</b> 🚫\n\n"
     "فقط <b>پسرای با جنبه</b> می‌تونن کیر پوینت بگیرن !\n"
     "اگه پسری و جنبه داری، برو توی ربات <b>جنسیتت</b> رو درست کن 😎"
 )
 
-KIR_NOT_STARTED = (
+# ===== کص پوینت =====
+KOS_NOT_FEMALE_HAVE = (
+    "🚫 <b>تو اجازه نداری کص پوینت بگیری</b> 🚫\n\n"
+    "فقط <b>دخترای با جنبه</b> می‌تونن کص پوینت بگیرن !\n"
+    "اگه دختری و جنبه داری، برو توی ربات <b>جنسیتت</b> رو درست کن 😎"
+)
+
+# ===== مشترک =====
+NOT_STARTED_TEXT = (
     "❓ <b>اول برو توی ربات استارت بزن</b> ❓\n\n"
     "باید اول توی ربات <b>/start</b> بزنی و <b>جنسیتت</b> رو انتخاب کنی !"
 )
@@ -127,10 +140,13 @@ def is_male_have(user: dict) -> bool:
     return user and user.get("gender") == "male_have"
 
 
+def is_female_have(user: dict) -> bool:
+    return user and user.get("gender") == "female_have"
+
+
 # ===== هندلرهای خصوصی =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/start - پیام خوشامد"""
     user = update.effective_user
 
     create_or_update_user(
@@ -306,28 +322,20 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for member in message.new_chat_members:
         if member.id == context.bot.id:
-            await message.reply_text(
-                GROUP_WELCOME_TEXT,
-                parse_mode="HTML",
-            )
-            await message.reply_text(
-                GROUP_HELP_TEXT,
-                parse_mode="HTML",
-            )
+            await message.reply_text(GROUP_WELCOME_TEXT, parse_mode="HTML")
+            await message.reply_text(GROUP_HELP_TEXT, parse_mode="HTML")
             return
 
 
 async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی کسی توی هر گروهی کلمه «کیر» رو نوشت"""
+    """کیر پوینت — پسرهای با جنبه"""
     message = update.message
     if not message or not message.text:
         return
 
-    # فقط توی گروه‌ها
     if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
         return
 
-    # چک کلمه کیر
     if KIR_WORD not in message.text:
         return
 
@@ -336,23 +344,14 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     db_user = get_user(user.id)
-
-    # اگه اصلاً استارت نزده
-    if not db_user:
-        await message.reply_text(KIR_NOT_STARTED, parse_mode="HTML")
+    if not db_user or not db_user.get("gender"):
+        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
 
-    # اگه جنسیت انتخاب نکرده
-    if not db_user.get("gender"):
-        await message.reply_text(KIR_NOT_STARTED, parse_mode="HTML")
-        return
-
-    # اگه پسر با جنبه نیست
     if not is_male_have(db_user):
         await message.reply_text(KIR_NOT_MALE_HAVE, parse_mode="HTML")
         return
 
-    # چک کول‌داون
     can_claim, remaining = can_claim_kir(user.id, KIR_POINT_COOLDOWN)
     info = get_kir_points(user.id)
     current_total = info["points"] if info else 0
@@ -368,12 +367,65 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # اضافه کردن امتیاز
     new_total = add_kir_points(user.id, KIR_POINT_REWARD)
 
     await message.reply_text(
         f"🍌 <b>{KIR_POINT_REWARD} کیر پوینت گرفتی</b> 🍌\n\n"
         f"💦 <b>کیر پوینت هات :</b> {new_total}\n\n"
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
+        parse_mode="HTML",
+    )
+
+
+async def kos_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """کص پوینت — دخترهای با جنبه"""
+    message = update.message
+    if not message or not message.text:
+        return
+
+    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    # چک کن کلمه «کیر» نباشه (چون کیر اولویت داره و توی kos_handler هم میاد)
+    if KIR_WORD in message.text:
+        return
+
+    if KOS_WORD not in message.text:
+        return
+
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+
+    db_user = get_user(user.id)
+    if not db_user or not db_user.get("gender"):
+        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
+        return
+
+    if not is_female_have(db_user):
+        await message.reply_text(KOS_NOT_FEMALE_HAVE, parse_mode="HTML")
+        return
+
+    can_claim, remaining = can_claim_kos(user.id, KOS_POINT_COOLDOWN)
+    info = get_kos_points(user.id)
+    current_total = info["points"] if info else 0
+
+    if not can_claim:
+        minutes = remaining // 60
+        seconds = remaining % 60
+        await message.reply_text(
+            f"⏳ <b>صبر کن دختر</b> ⏳\n\n"
+            f"🍑 <b>کص پوینت هات :</b> {current_total}\n\n"
+            f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
+            parse_mode="HTML",
+        )
+        return
+
+    new_total = add_kos_points(user.id, KOS_POINT_REWARD)
+
+    await message.reply_text(
+        f"🍑 <b>{KOS_POINT_REWARD} کص پوینت گرفتی</b> 🍑\n\n"
+        f"💦 <b>کص پوینت هات :</b> {new_total}\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
