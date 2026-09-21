@@ -4,14 +4,17 @@ from telegram.constants import ChatType
 
 from config import (
     CHANNEL_ID,
-    KIR_POINT_REWARD, KIR_POINT_COOLDOWN, KIR_WORD,
-    KOS_POINT_REWARD, KOS_POINT_COOLDOWN, KOS_WORD,
+    KIR_POINT_REWARD, KOS_POINT_REWARD,
+    WEAK_POINT_REWARD, HIGH_POINT_REWARD, TOP_POINT_REWARD,
+    KIR_POINT_COOLDOWN,
+    KIR_WORD, KOS_WORD, MALE_GOOD_WORD, FEMALE_GOOD_WORD,
+    HIGH_WORD, TOP_WORD,
+    HIGH_THRESHOLD, TOP_THRESHOLD,
 )
 from database import (
     create_or_update_user, set_user_joined, set_user_gender,
     log_join_action, get_user, get_stats,
-    add_kir_points, can_claim_kir, get_kir_points,
-    add_kos_points, can_claim_kos, get_kos_points,
+    add_points, can_claim, get_points,
 )
 from keyboards import join_keyboard, gender_keyboard, confirm_keyboard
 
@@ -39,15 +42,10 @@ MALE_HAVE_TEXT = (
     "🍌 <b>شنیدم دلت کیر میخواد</b> 🍌\n\n"
     "تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به گایی هات برای ایران 🤡\n\n"
     "کیر و کص جمع کن تا بتونی <b>کصخل بهتری</b> باشی\n\n"
-    "شنیدم دلت کیر میخواد🍌\n"
-    "تو می‌تونی یه <b>کصخل بامزه</b> باشی برای به گایی هات برای ایران 🤡\n\n"
-    "کیر و کص جمع کن تا بتونی <b>کصخل بهتری</b> باشی\n\n"
     "شمارو بعضی وقتا به تخممون میگیریم\n"
     "عملکردخوب که نه ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی\n"
     "آپدیت های سالیانه میدیم بیرون\n"
-    "مثل شما می‌تونیم یه کصخل باشیم\n"
-    "پشتیبانی <b>۲۶ ساعته</b>\n"
-    "کاملا رایگان بعضی وقتا پولی"
+    "پشتیبانی <b>۲۶ ساعته</b>"
 )
 
 FEMALE_HAVE_TEXT = (
@@ -57,9 +55,7 @@ FEMALE_HAVE_TEXT = (
     "شمارو بعضی وقتا به تخممون میگیریم\n"
     "عملکردخوب که نه ولی تو می‌تونی <b>کصخل نیو</b> داشته باشی\n"
     "آپدیت های سالیانه میدیم بیرون\n"
-    "مثل شما می‌تونیم یه کصخل باشیم\n"
-    "پشتیبانی <b>۲۶ ساعته</b>\n"
-    "کاملا رایگان بعضی وقتا پولی"
+    "پشتیبانی <b>۲۶ ساعته</b>"
 )
 
 MALE_DONT_TEXT = (
@@ -87,39 +83,75 @@ CANCEL_TEXT = (
     "دوباره برو <b>جنسیتت</b> رو تایید کن !"
 )
 
-# ===== متن‌های گروه =====
+# ===== گروه =====
 GROUP_WELCOME_TEXT = (
     "🎉 <b>کصخل خیز وارد گروه شده</b> 🍌\n\n"
     "پاشید همگی <b>جق بزنید</b> 💦✊"
 )
 
-GROUP_HELP_TEXT = (
-    "📌 <b>راهنمای ربات:</b>\n\n"
-    "👦 <b>پسرا:</b> کلمه <b>کیر</b> رو بنویسن تا <b>کیر پوینت</b> بگیرن 🍌\n\n"
-    "👧 <b>دخترا:</b> کلمه <b>کص</b> رو بنویسن تا <b>کص پوینت</b> بگیرن 🍑\n\n"
-    "⚠️ فقط <b>پسرای با جنبه</b> و <b>دخترای با جنبه</b> می‌تونن امتیاز بگیرن !\n"
-    "اگه توی ربات <b>/start</b> نزدی یا جنسیتت رو انتخاب نکردی، اول برو توی ربات !\n\n"
-    "⏳ هر <b>۳ دقیقه</b> یه بار می‌تونی امتیاز بگیری"
+# ===== راهنمای شومبولی =====
+SHOMBOLI_HELP = (
+    "📖 <b>راهنمای شومبولی</b>\n\n"
+
+    "🍌 <b>پسر با جنبه؟</b>\n"
+    "بنویس <b>کیر</b> → ۵ امتیاز\n\n"
+
+    "🍑 <b>دختر با جنبه؟</b>\n"
+    "بنویس <b>کص</b> → ۵ امتیاز\n\n"
+
+    "🌹 <b>پسر بی‌جنبه؟</b>\n"
+    "بنویس <b>پسر خوب</b> → ۱ امتیاز\n\n"
+
+    "🌸 <b>دختر بی‌جنبه؟</b>\n"
+    "بنویس <b>دختر خوب</b> → ۱ امتیاز\n\n"
+
+    "💎 <b>بالای ۵۰۰۰۰ امتیاز؟</b>\n"
+    "بنویس <b>سلام گلم</b> → ۱ امتیاز\n\n"
+
+    "🍰 <b>بالای ۲۰۰۰۰۰ امتیاز؟</b>\n"
+    "بنویس <b>کیک</b> → ۱ امتیاز\n\n"
+
+    "⏳ هر ۳ دقیقه یه بار\n\n"
+
+    "🚫 <b>بی‌جنبه‌ها فقط ۱ امتیاز</b>"
 )
 
-# ===== کیر پوینت =====
-KIR_NOT_MALE_HAVE = (
-    "🚫 <b>تو اجازه نداری کیر پوینت بگیری</b> 🚫\n\n"
-    "فقط <b>پسرای با جنبه</b> می‌تونن کیر پوینت بگیرن !\n"
-    "اگه پسری و جنبه داری، برو توی ربات <b>جنسیتت</b> رو درست کن 😎"
-)
-
-# ===== کص پوینت =====
-KOS_NOT_FEMALE_HAVE = (
-    "🚫 <b>تو اجازه نداری کص پوینت بگیری</b> 🚫\n\n"
-    "فقط <b>دخترای با جنبه</b> می‌تونن کص پوینت بگیرن !\n"
-    "اگه دختری و جنبه داری، برو توی ربات <b>جنسیتت</b> رو درست کن 😎"
-)
-
-# ===== مشترک =====
+# ===== پیام‌های خطا =====
 NOT_STARTED_TEXT = (
     "❓ <b>اول برو توی ربات استارت بزن</b> ❓\n\n"
     "باید اول توی ربات <b>/start</b> بزنی و <b>جنسیتت</b> رو انتخاب کنی !"
+)
+
+KIR_NOT_ALLOWED = (
+    "🚫 <b>تو اجازه نداری کیر پوینت بگیری</b> 🚫\n\n"
+    "فقط <b>پسرای با جنبه</b> می‌تونن کیر پوینت بگیرن !"
+)
+
+KOS_NOT_ALLOWED = (
+    "🚫 <b>تو اجازه نداری کص پوینت بگیری</b> 🚫\n\n"
+    "فقط <b>دخترای با جنبه</b> می‌تونن کص پوینت بگیرن !"
+)
+
+MALE_GOOD_NOT_ALLOWED = (
+    "🚫 <b>تو پسر بی‌جنبه نیستی!</b>\n\n"
+    "این کلمه فقط برای <b>پسرای بی‌جنبه</b>ست.\n"
+    "اگه پسر با جنبه هستی، بنویس <b>کیر</b> 🍌"
+)
+
+FEMALE_GOOD_NOT_ALLOWED = (
+    "🚫 <b>تو دختر بی‌جنبه نیستی!</b>\n\n"
+    "این کلمه فقط برای <b>دخترای بی‌جنبه</b>ست.\n"
+    "اگه دختر با جنبه هستی، بنویس <b>کص</b> 🍑"
+)
+
+HIGH_NOT_ALLOWED = (
+    "💎 <b>این کلمه مخصوص بالای ۵۰۰۰۰ امتیازه!</b>\n\n"
+    f"الان امتیازت کمه. برو امتیاز جمع کن !"
+)
+
+TOP_NOT_ALLOWED = (
+    "🍰 <b>این کلمه مخصوص بالای ۲۰۰۰۰۰ امتیازه!</b>\n\n"
+    f"الان امتیازت کمه. برو امتیاز جمع کن !"
 )
 
 
@@ -136,15 +168,7 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
         return False
 
 
-def is_male_have(user: dict) -> bool:
-    return user and user.get("gender") == "male_have"
-
-
-def is_female_have(user: dict) -> bool:
-    return user and user.get("gender") == "female_have"
-
-
-# ===== هندلرهای خصوصی =====
+# ===== هندلرهای چت خصوصی =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -280,10 +304,7 @@ async def confirm_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "confirm":
         set_user_gender(user_id, gender_value)
         try:
-            await query.edit_message_text(
-                CONFIRM_TEXT,
-                parse_mode="HTML",
-            )
+            await query.edit_message_text(CONFIRM_TEXT, parse_mode="HTML")
         except Exception:
             pass
         await query.answer("✅ ثبت شد")
@@ -312,6 +333,33 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/help - راهنمای شومبولی"""
+    await update.message.reply_text(SHOMBOLI_HELP, parse_mode="HTML")
+
+
+async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/mypoints - دیدن امتیازهای خودت"""
+    user = update.effective_user
+    db_user = get_user(user.id)
+
+    if not db_user or not db_user.get("gender"):
+        await update.message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
+        return
+
+    info = get_points(user.id)
+    total = info["points"] if info else 0
+
+    await update.message.reply_text(
+        f"📊 <b>امتیازت:</b> {total}\n\n"
+        f"🍌 کیر / 🍑 کص → ۵ امتیاز\n"
+        f"🌹 پسر خوب / 🌸 دختر خوب → ۱ امتیاز\n"
+        f"💎 سلام گلم (بالای ۵۰۰۰۰) → ۱ امتیاز\n"
+        f"🍰 کیک (بالای ۲۰۰۰۰۰) → ۱ امتیاز",
+        parse_mode="HTML",
+    )
+
+
 # ===== هندلرهای گروه =====
 
 async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -323,12 +371,12 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in message.new_chat_members:
         if member.id == context.bot.id:
             await message.reply_text(GROUP_WELCOME_TEXT, parse_mode="HTML")
-            await message.reply_text(GROUP_HELP_TEXT, parse_mode="HTML")
+            await message.reply_text(SHOMBOLI_HELP, parse_mode="HTML")
             return
 
 
-async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """کیر پوینت — پسرهای با جنبه"""
+async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر کلی امتیاز — همه کلمات رو چک میکنه"""
     message = update.message
     if not message or not message.text:
         return
@@ -336,96 +384,108 @@ async def kir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
         return
 
-    if KIR_WORD not in message.text:
-        return
-
     user = message.from_user
     if not user or user.is_bot:
         return
 
+    text = message.text
     db_user = get_user(user.id)
+
+    # چک استارت خورده یا نه
     if not db_user or not db_user.get("gender"):
         await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
 
-    if not is_male_have(db_user):
-        await message.reply_text(KIR_NOT_MALE_HAVE, parse_mode="HTML")
-        return
-
-    can_claim, remaining = can_claim_kir(user.id, KIR_POINT_COOLDOWN)
-    info = get_kir_points(user.id)
+    gender = db_user["gender"]
+    info = get_points(user.id)
     current_total = info["points"] if info else 0
 
-    if not can_claim:
+    # ===== تعیین کلمه و امتیاز =====
+    reward = 0
+    matched = False
+    reply_emoji = ""
+
+    # 1) پسر با جنبه → کیر
+    if KIR_WORD in text:
+        if gender == "male_have":
+            reward = KIR_POINT_REWARD
+            matched = True
+            reply_emoji = "🍌"
+        else:
+            await message.reply_text(KIR_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 2) دختر با جنبه → کص
+    elif KOS_WORD in text:
+        if gender == "female_have":
+            reward = KOS_POINT_REWARD
+            matched = True
+            reply_emoji = "🍑"
+        else:
+            await message.reply_text(KOS_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 3) پسر بی‌جنبه → پسر خوب (فقط ۱ امتیاز)
+    elif MALE_GOOD_WORD in text:
+        if gender == "male_dont":
+            reward = WEAK_POINT_REWARD
+            matched = True
+            reply_emoji = "🌹"
+        else:
+            await message.reply_text(MALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 4) دختر بی‌جنبه → دختر خوب (فقط ۱ امتیاز)
+    elif FEMALE_GOOD_WORD in text:
+        if gender == "female_dont":
+            reward = WEAK_POINT_REWARD
+            matched = True
+            reply_emoji = "🌸"
+        else:
+            await message.reply_text(FEMALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 5) بالای ۵۰۰۰۰ → سلام گلم
+    elif HIGH_WORD in text:
+        if current_total < HIGH_THRESHOLD:
+            await message.reply_text(HIGH_NOT_ALLOWED, parse_mode="HTML")
+            return
+        reward = HIGH_POINT_REWARD
+        matched = True
+        reply_emoji = "💎"
+
+    # 6) بالای ۲۰۰۰۰۰ → کیک
+    elif TOP_WORD in text:
+        if current_total < TOP_THRESHOLD:
+            await message.reply_text(TOP_NOT_ALLOWED, parse_mode="HTML")
+            return
+        reward = TOP_POINT_REWARD
+        matched = True
+        reply_emoji = "🍰"
+
+    if not matched:
+        return
+
+    # ===== چک کول‌داون =====
+    can, remaining = can_claim(user.id, KIR_POINT_COOLDOWN)
+
+    if not can:
         minutes = remaining // 60
         seconds = remaining % 60
         await message.reply_text(
-            f"⏳ <b>صبر کن جقی</b> ⏳\n\n"
-            f"💦 <b>کیر پوینت هات :</b> {current_total}\n\n"
+            f"⏳ <b>صبر کن</b> ⏳\n\n"
+            f"💰 <b>امتیازت:</b> {current_total}\n\n"
             f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
             parse_mode="HTML",
         )
         return
 
-    new_total = add_kir_points(user.id, KIR_POINT_REWARD)
+    # ===== اضافه کردن امتیاز =====
+    new_total = add_points(user.id, reward)
 
     await message.reply_text(
-        f"🍌 <b>{KIR_POINT_REWARD} کیر پوینت گرفتی</b> 🍌\n\n"
-        f"💦 <b>کیر پوینت هات :</b> {new_total}\n\n"
-        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
-        parse_mode="HTML",
-    )
-
-
-async def kos_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """کص پوینت — دخترهای با جنبه"""
-    message = update.message
-    if not message or not message.text:
-        return
-
-    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
-        return
-
-    # چک کن کلمه «کیر» نباشه (چون کیر اولویت داره و توی kos_handler هم میاد)
-    if KIR_WORD in message.text:
-        return
-
-    if KOS_WORD not in message.text:
-        return
-
-    user = message.from_user
-    if not user or user.is_bot:
-        return
-
-    db_user = get_user(user.id)
-    if not db_user or not db_user.get("gender"):
-        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
-        return
-
-    if not is_female_have(db_user):
-        await message.reply_text(KOS_NOT_FEMALE_HAVE, parse_mode="HTML")
-        return
-
-    can_claim, remaining = can_claim_kos(user.id, KOS_POINT_COOLDOWN)
-    info = get_kos_points(user.id)
-    current_total = info["points"] if info else 0
-
-    if not can_claim:
-        minutes = remaining // 60
-        seconds = remaining % 60
-        await message.reply_text(
-            f"⏳ <b>صبر کن دختر</b> ⏳\n\n"
-            f"🍑 <b>کص پوینت هات :</b> {current_total}\n\n"
-            f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
-            parse_mode="HTML",
-        )
-        return
-
-    new_total = add_kos_points(user.id, KOS_POINT_REWARD)
-
-    await message.reply_text(
-        f"🍑 <b>{KOS_POINT_REWARD} کص پوینت گرفتی</b> 🍑\n\n"
-        f"💦 <b>کص پوینت هات :</b> {new_total}\n\n"
+        f"{reply_emoji} <b>{reward} امتیاز گرفتی</b> {reply_emoji}\n\n"
+        f"💰 <b>امتیازت:</b> {new_total}\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
