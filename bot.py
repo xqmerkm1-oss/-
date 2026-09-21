@@ -14,8 +14,8 @@ from config import (
 from database import init_db
 from handlers import (
     start, check_join, gender_choice, confirm_choice, stats,
-    help_command, my_points,
-    group_welcome, points_handler,
+    my_points,
+    group_welcome, rahnama_handler, help_callback, points_handler,
 )
 
 logging.basicConfig(
@@ -33,17 +33,18 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ===== چت خصوصی =====
+    # ===== دستورات اسلش (فقط چت خصوصی) =====
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("mypoints", my_points))
     app.add_handler(CommandHandler("stats", stats))
 
+    # ===== کیبوردها =====
     app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
     app.add_handler(CallbackQueryHandler(gender_choice, pattern="^gender_"))
     app.add_handler(CallbackQueryHandler(
         confirm_choice, pattern="^(confirm|cancel)_"
     ))
+    app.add_handler(CallbackQueryHandler(help_callback, pattern="^help_"))
 
     # ===== گروه =====
     app.add_handler(MessageHandler(
@@ -51,7 +52,13 @@ def main():
         group_welcome,
     ))
 
-    # ===== کلمات کلیدی (همه توی یه هندلر) =====
+    # راهنما (کلمه «راهنما»)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex("راهنما"),
+        rahnama_handler,
+    ))
+
+    # کلمات امتیاز
     all_words_pattern = "|".join([
         KIR_WORD, KOS_WORD,
         MALE_GOOD_WORD, FEMALE_GOOD_WORD,
