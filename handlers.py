@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 
@@ -89,33 +89,6 @@ GROUP_WELCOME_TEXT = (
     "پاشید همگی <b>جق بزنید</b> 💦✊"
 )
 
-# ===== راهنمای شومبولی =====
-SHOMBOLI_HELP = (
-    "📖 <b>راهنمای شومبولی</b>\n\n"
-
-    "🍌 <b>پسر با جنبه؟</b>\n"
-    "بنویس <b>کیر</b> → ۵ امتیاز\n\n"
-
-    "🍑 <b>دختر با جنبه؟</b>\n"
-    "بنویس <b>کص</b> → ۵ امتیاز\n\n"
-
-    "🌹 <b>پسر بی‌جنبه؟</b>\n"
-    "بنویس <b>پسر خوب</b> → ۱ امتیاز\n\n"
-
-    "🌸 <b>دختر بی‌جنبه؟</b>\n"
-    "بنویس <b>دختر خوب</b> → ۱ امتیاز\n\n"
-
-    "💎 <b>بالای ۵۰۰۰۰ امتیاز؟</b>\n"
-    "بنویس <b>سلام گلم</b> → ۱ امتیاز\n\n"
-
-    "🍰 <b>بالای ۲۰۰۰۰۰ امتیاز؟</b>\n"
-    "بنویس <b>کیک</b> → ۱ امتیاز\n\n"
-
-    "⏳ هر ۳ دقیقه یه بار\n\n"
-
-    "🚫 <b>بی‌جنبه‌ها فقط ۱ امتیاز</b>"
-)
-
 # ===== پیام‌های خطا =====
 NOT_STARTED_TEXT = (
     "❓ <b>اول برو توی ربات استارت بزن</b> ❓\n\n"
@@ -152,6 +125,173 @@ HIGH_NOT_ALLOWED = (
 TOP_NOT_ALLOWED = (
     "🍰 <b>این کلمه مخصوص بالای ۲۰۰۰۰۰ امتیازه!</b>\n\n"
     f"الان امتیازت کمه. برو امتیاز جمع کن !"
+)
+
+
+# ============================================================
+# راهنمای کامل
+# ============================================================
+
+def help_keyboard() -> InlineKeyboardMarkup:
+    """دکمه‌های رنگی راهنما"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🍌 کیر پوینت",
+                callback_data="help_kir",
+                api_kwargs={"style": "success"},
+            ),
+            InlineKeyboardButton(
+                "🍑 کص پوینت",
+                callback_data="help_kos",
+                api_kwargs={"style": "success"},
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🌹 پسر بی‌جنبه",
+                callback_data="help_male_dont",
+                api_kwargs={"style": "danger"},
+            ),
+            InlineKeyboardButton(
+                "🌸 دختر بی‌جنبه",
+                callback_data="help_female_dont",
+                api_kwargs={"style": "danger"},
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "💎 سلام گلم",
+                callback_data="help_high",
+                api_kwargs={"style": "primary"},
+            ),
+            InlineKeyboardButton(
+                "🍰 کیک",
+                callback_data="help_top",
+                api_kwargs={"style": "primary"},
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "💰 امتیاز من",
+                callback_data="help_mypoints",
+                api_kwargs={"style": "primary"},
+            ),
+        ],
+    ])
+
+
+HELP_MAIN_TEXT = (
+    "📖 <b>راهنمای کامل ربات کصخل خیز</b> 📖\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    "🎯 <b>این ربات چیکار می‌کنه؟</b>\n"
+    "توی گروه‌ها کلمه‌های خاصی بنویس، ربات بهت <b>امتیاز</b> میده "
+    "و می‌تونی به رفیقات <b>پز بدی</b> 😎\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "📋 <b>کلمه‌ها و امتیازها:</b>\n\n"
+
+    "🍌 <b>پسر با جنبه</b> → بنویس <b>کیر</b> → ۵ کیر پوینت\n"
+    "🍑 <b>دختر با جنبه</b> → بنویس <b>کص</b> → ۵ کص پوینت\n"
+    "🌹 <b>پسر بی‌جنبه</b> → بنویس <b>پسر خوب</b> → ۱ پوینت\n"
+    "🌸 <b>دختر بی‌جنبه</b> → بنویس <b>دختر خوب</b> → ۱ پوینت\n"
+    "💎 <b>بالای ۵۰۰۰۰</b> → بنویس <b>سلام گلم</b> → ۱ پوینت\n"
+    "🍰 <b>بالای ۲۰۰۰۰۰</b> → بنویس <b>کیک</b> → ۱ پوینت\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⏳ <b>محدودیت زمانی:</b>\n"
+    "هر <b>۳ دقیقه</b> یه بار می‌تونی امتیاز بگیری.\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️ <b>نکات مهم:</b>\n\n"
+    "🚫 اگه <b>بی‌جنبه</b> باشی، <b>نمی‌تونی از ۱۰۰٪ ربات استفاده کنی</b> "
+    "و فقط <b>۱ پوینت</b> می‌گیری.\n\n"
+    "🚫 اگه توی ربات <b>/start</b> نزدی یا <b>جنسیتت</b> رو انتخاب نکردی، "
+    "هیچ امتیازی نمی‌گیری.\n\n"
+    "✅ <b>فقط پسرای با جنبه</b> → کیر پوینت\n"
+    "✅ <b>فقط دخترای با جنبه</b> → کص پوینت\n\n"
+
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "👇 <b>برای توضیح بیشتر، روی دکمه‌های زیر بزن:</b>"
+)
+
+HELP_KIR_TEXT = (
+    "🍌 <b>کیر پوینت</b> 🍌\n\n"
+    "👦 فقط <b>پسرای با جنبه</b> می‌تونن بگیرن.\n\n"
+    "📝 <b>چطور بگیرم؟</b>\n"
+    "توی گروه کلمه <b>کیر</b> رو بنویس.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "<b>۵ کیر پوینت</b> هر بار.\n\n"
+    "⏳ <b>هر چند وقت؟</b>\n"
+    "هر <b>۳ دقیقه</b> یه بار.\n\n"
+    "🚫 <b>کی نمی‌گیره؟</b>\n"
+    "• دخترا\n"
+    "• پسرای بی‌جنبه\n"
+    "• کسایی که استارت نزدن"
+)
+
+HELP_KOS_TEXT = (
+    "🍑 <b>کص پوینت</b> 🍑\n\n"
+    "👧 فقط <b>دخترای با جنبه</b> می‌تونن بگیرن.\n\n"
+    "📝 <b>چطور بگیرم؟</b>\n"
+    "توی گروه کلمه <b>کص</b> رو بنویس.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "<b>۵ کص پوینت</b> هر بار.\n\n"
+    "⏳ <b>هر چند وقت؟</b>\n"
+    "هر <b>۳ دقیقه</b> یه بار.\n\n"
+    "🚫 <b>کی نمی‌گیره؟</b>\n"
+    "• پسرا\n"
+    "• دخترای بی‌جنبه\n"
+    "• کسایی که استارت نزدن"
+)
+
+HELP_MALE_DONT_TEXT = (
+    "🌹 <b>پسر بی‌جنبه</b> 🌹\n\n"
+    "😐 اگه <b>پسر</b> هستی ولی <b>جنبه نداری</b>، "
+    "این بخش مخصوص توئه.\n\n"
+    "📝 <b>چیکار کنم؟</b>\n"
+    "توی گروه بنویس <b>پسر خوب</b>.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "فقط <b>۱ پوینت</b> هر بار.\n\n"
+    "⚠️ <b>نکته:</b>\n"
+    "چون بی‌جنبه‌ای، نمی‌تونی از ۱۰۰٪ ربات استفاده کنی!"
+)
+
+HELP_FEMALE_DONT_TEXT = (
+    "🌸 <b>دختر بی‌جنبه</b> 🌸\n\n"
+    "😐 اگه <b>دختر</b> هستی ولی <b>جنبه نداری</b>، "
+    "این بخش مخصوص توئه.\n\n"
+    "📝 <b>چیکار کنم؟</b>\n"
+    "توی گروه بنویس <b>دختر خوب</b>.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "فقط <b>۱ پوینت</b> هر بار.\n\n"
+    "⚠️ <b>نکته:</b>\n"
+    "چون بی‌جنبه‌ای، نمی‌تونی از ۱۰۰٪ ربات استفاده کنی!"
+)
+
+HELP_HIGH_TEXT = (
+    "💎 <b>سلام گلم</b> 💎\n\n"
+    "🔓 <b>مخصوص بالای ۵۰۰۰۰ امتیاز!</b>\n\n"
+    "📝 <b>چطور بگیرم؟</b>\n"
+    "اول باید <b>۵۰۰۰۰ امتیاز</b> جمع کنی، "
+    "بعد می‌تونی بنویسی <b>سلام گلم</b>.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "<b>۱ پوینت</b> هر بار.\n\n"
+    "🔒 <b>اگه امتیازت کم باشه:</b>\n"
+    "ربات بهت میگه برو امتیاز جمع کن!"
+)
+
+HELP_TOP_TEXT = (
+    "🍰 <b>کیک</b> 🍰\n\n"
+    "🔓 <b>مخصوص بالای ۲۰۰۰۰۰ امتیاز!</b>\n\n"
+    "📝 <b>چطور بگیرم؟</b>\n"
+    "اول باید <b>۲۰۰۰۰۰ امتیاز</b> جمع کنی، "
+    "بعد می‌تونی بنویسی <b>کیک</b>.\n\n"
+    "💰 <b>چقدر میده؟</b>\n"
+    "<b>۱ پوینت</b> هر بار.\n\n"
+    "🔒 <b>اگه امتیازت کم باشه:</b>\n"
+    "ربات بهت میگه برو امتیاز جمع کن!"
 )
 
 
@@ -333,11 +473,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/help - راهنمای شومبولی"""
-    await update.message.reply_text(SHOMBOLI_HELP, parse_mode="HTML")
-
-
 async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/mypoints - دیدن امتیازهای خودت"""
     user = update.effective_user
@@ -351,11 +486,13 @@ async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = info["points"] if info else 0
 
     await update.message.reply_text(
-        f"📊 <b>امتیازت:</b> {total}\n\n"
-        f"🍌 کیر / 🍑 کص → ۵ امتیاز\n"
-        f"🌹 پسر خوب / 🌸 دختر خوب → ۱ امتیاز\n"
-        f"💎 سلام گلم (بالای ۵۰۰۰۰) → ۱ امتیاز\n"
-        f"🍰 کیک (بالای ۲۰۰۰۰۰) → ۱ امتیاز",
+        f"💰 <b>امتیازت:</b> {total}\n\n"
+        f"🍌 کیر → ۵ کیر پوینت\n"
+        f"🍑 کص → ۵ کص پوینت\n"
+        f"🌹 پسر خوب → ۱ پوینت\n"
+        f"🌸 دختر خوب → ۱ پوینت\n"
+        f"💎 سلام گلم (بالای ۵۰۰۰۰) → ۱ پوینت\n"
+        f"🍰 کیک (بالای ۲۰۰۰۰۰) → ۱ پوینت",
         parse_mode="HTML",
     )
 
@@ -371,8 +508,93 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in message.new_chat_members:
         if member.id == context.bot.id:
             await message.reply_text(GROUP_WELCOME_TEXT, parse_mode="HTML")
-            await message.reply_text(SHOMBOLI_HELP, parse_mode="HTML")
+            await message.reply_text(
+                HELP_MAIN_TEXT,
+                reply_markup=help_keyboard(),
+                parse_mode="HTML",
+            )
             return
+
+
+async def rahnama_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی کاربر توی گروه کلمه «راهنما» رو نوشت"""
+    message = update.message
+    if not message or not message.text:
+        return
+
+    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    if "راهنما" not in message.text:
+        return
+
+    await message.reply_text(
+        HELP_MAIN_TEXT,
+        reply_markup=help_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """کلیک روی دکمه‌های راهنما"""
+    query = update.callback_query
+    data = query.data
+
+    back_button = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🔙 برگشت به راهنما",
+                callback_data="help_main",
+                api_kwargs={"style": "primary"},
+            ),
+        ]
+    ])
+
+    mapping = {
+        "help_kir":         HELP_KIR_TEXT,
+        "help_kos":         HELP_KOS_TEXT,
+        "help_male_dont":   HELP_MALE_DONT_TEXT,
+        "help_female_dont": HELP_FEMALE_DONT_TEXT,
+        "help_high":        HELP_HIGH_TEXT,
+        "help_top":         HELP_TOP_TEXT,
+    }
+
+    if data == "help_main":
+        try:
+            await query.edit_message_text(
+                HELP_MAIN_TEXT,
+                reply_markup=help_keyboard(),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        await query.answer()
+        return
+
+    if data == "help_mypoints":
+        user = query.from_user
+        db_user = get_user(user.id)
+        if not db_user or not db_user.get("gender"):
+            await query.answer("اول /start بزن!", show_alert=True)
+            return
+        info = get_points(user.id)
+        total = info["points"] if info else 0
+        await query.answer(f"💰 امتیازت: {total}", show_alert=True)
+        return
+
+    if data not in mapping:
+        await query.answer()
+        return
+
+    try:
+        await query.edit_message_text(
+            mapping[data],
+            reply_markup=back_button,
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"[help_callback error] {e}")
+    await query.answer()
 
 
 async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,7 +613,6 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = message.text
     db_user = get_user(user.id)
 
-    # چک استارت خورده یا نه
     if not db_user or not db_user.get("gender"):
         await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
         return
@@ -400,17 +621,18 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = get_points(user.id)
     current_total = info["points"] if info else 0
 
-    # ===== تعیین کلمه و امتیاز =====
     reward = 0
     matched = False
-    reply_emoji = ""
+    emoji = ""
+    point_name = ""
 
     # 1) پسر با جنبه → کیر
     if KIR_WORD in text:
         if gender == "male_have":
             reward = KIR_POINT_REWARD
             matched = True
-            reply_emoji = "🍌"
+            emoji = "🍌"
+            point_name = "کیر پوینت"
         else:
             await message.reply_text(KIR_NOT_ALLOWED, parse_mode="HTML")
             return
@@ -420,27 +642,30 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if gender == "female_have":
             reward = KOS_POINT_REWARD
             matched = True
-            reply_emoji = "🍑"
+            emoji = "🍑"
+            point_name = "کص پوینت"
         else:
             await message.reply_text(KOS_NOT_ALLOWED, parse_mode="HTML")
             return
 
-    # 3) پسر بی‌جنبه → پسر خوب (فقط ۱ امتیاز)
+    # 3) پسر بی‌جنبه → پسر خوب
     elif MALE_GOOD_WORD in text:
         if gender == "male_dont":
             reward = WEAK_POINT_REWARD
             matched = True
-            reply_emoji = "🌹"
+            emoji = "🌹"
+            point_name = "پسر خوب پوینت"
         else:
             await message.reply_text(MALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
             return
 
-    # 4) دختر بی‌جنبه → دختر خوب (فقط ۱ امتیاز)
+    # 4) دختر بی‌جنبه → دختر خوب
     elif FEMALE_GOOD_WORD in text:
         if gender == "female_dont":
             reward = WEAK_POINT_REWARD
             matched = True
-            reply_emoji = "🌸"
+            emoji = "🌸"
+            point_name = "دختر خوب پوینت"
         else:
             await message.reply_text(FEMALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
             return
@@ -452,7 +677,8 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         reward = HIGH_POINT_REWARD
         matched = True
-        reply_emoji = "💎"
+        emoji = "💎"
+        point_name = "سلام گلم پوینت"
 
     # 6) بالای ۲۰۰۰۰۰ → کیک
     elif TOP_WORD in text:
@@ -461,12 +687,12 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         reward = TOP_POINT_REWARD
         matched = True
-        reply_emoji = "🍰"
+        emoji = "🍰"
+        point_name = "کیک پوینت"
 
     if not matched:
         return
 
-    # ===== چک کول‌داون =====
     can, remaining = can_claim(user.id, KIR_POINT_COOLDOWN)
 
     if not can:
@@ -474,18 +700,17 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         seconds = remaining % 60
         await message.reply_text(
             f"⏳ <b>صبر کن</b> ⏳\n\n"
-            f"💰 <b>امتیازت:</b> {current_total}\n\n"
+            f"{emoji} <b>{point_name} هات :</b> {current_total}\n\n"
             f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
             parse_mode="HTML",
         )
         return
 
-    # ===== اضافه کردن امتیاز =====
     new_total = add_points(user.id, reward)
 
     await message.reply_text(
-        f"{reply_emoji} <b>{reward} امتیاز گرفتی</b> {reply_emoji}\n\n"
-        f"💰 <b>امتیازت:</b> {new_total}\n\n"
+        f"{emoji} <b>{reward} {point_name} گرفتی</b> {emoji}\n\n"
+        f"💰 <b>{point_name} هات :</b> {new_total}\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode="HTML",
     )
