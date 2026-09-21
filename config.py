@@ -15,7 +15,12 @@ CHANNEL_LINK = os.getenv("CHANNEL_LINK") or DEFAULT_CHANNEL_LINK
 # ===== دیتابیس Postgres =====
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ===== کیر پوینت =====
-KIR_POINT_REWARD = 5          # امتیاز هر بار
-KIR_POINT_COOLDOWN = 180      # ثانیه (۳ دقیقه)
-KIR_WORD = "کیر"              # کلمه‌ای که امتیاز میده
+# ===== کیر پوینت (پسرها) =====
+KIR_POINT_REWARD = 5
+KIR_POINT_COOLDOWN = 180      # ۳ دقیقه
+KIR_WORD = "کیر"
+
+# ===== کص پوینت (دخترها) =====
+KOS_POINT_REWARD = 5
+KOS_POINT_COOLDOWN = 180      # ۳ دقیقه
+KOS_WORD = "کص"
