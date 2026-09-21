@@ -678,4 +678,127 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message or not message.text:
         return
 
-    if message.chat.type not in (
+    if message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+
+    # ===== پاک کردن فاصله‌های اضافی و مقایسه دقیق =====
+    text = message.text.strip()
+
+    # ===== چک می‌کنیم که متن دقیقاً یکی از کلمات باشه =====
+    exact_match = None
+
+    if text == KIR_WORD:
+        exact_match = KIR_WORD
+    elif text == KOS_WORD:
+        exact_match = KOS_WORD
+    elif text == MALE_GOOD_WORD:
+        exact_match = MALE_GOOD_WORD
+    elif text == FEMALE_GOOD_WORD:
+        exact_match = FEMALE_GOOD_WORD
+    elif text == HIGH_WORD:
+        exact_match = HIGH_WORD
+    elif text == TOP_WORD:
+        exact_match = TOP_WORD
+
+    # اگه دقیقاً کلمه نبود، هیچی نکن
+    if not exact_match:
+        return
+
+    db_user = get_user(user.id)
+
+    if not db_user or not db_user.get("gender"):
+        await message.reply_text(NOT_STARTED_TEXT, parse_mode="HTML")
+        return
+
+    gender = db_user["gender"]
+    info = get_points(user.id)
+    current_total = info["points"] if info else 0
+
+    reward = 0
+    emoji = ""
+    point_name = ""
+
+    # 1) پسر با جنبه → کیر
+    if exact_match == KIR_WORD:
+        if gender == "male_have":
+            reward = KIR_POINT_REWARD
+            emoji = "🍌"
+            point_name = "کیر پوینت"
+        else:
+            await message.reply_text(KIR_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 2) دختر با جنبه → کص
+    elif exact_match == KOS_WORD:
+        if gender == "female_have":
+            reward = KOS_POINT_REWARD
+            emoji = "🍑"
+            point_name = "کص پوینت"
+        else:
+            await message.reply_text(KOS_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 3) پسر بی‌جنبه → پسر خوب
+    elif exact_match == MALE_GOOD_WORD:
+        if gender == "male_dont":
+            reward = WEAK_POINT_REWARD
+            emoji = "🌹"
+            point_name = "پسر خوب پوینت"
+        else:
+            await message.reply_text(MALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 4) دختر بی‌جنبه → دختر خوب
+    elif exact_match == FEMALE_GOOD_WORD:
+        if gender == "female_dont":
+            reward = WEAK_POINT_REWARD
+            emoji = "🌸"
+            point_name = "دختر خوب پوینت"
+        else:
+            await message.reply_text(FEMALE_GOOD_NOT_ALLOWED, parse_mode="HTML")
+            return
+
+    # 5) بالای ۵۰۰۰۰ → سلام گلم
+    elif exact_match == HIGH_WORD:
+        if current_total < HIGH_THRESHOLD:
+            await message.reply_text(HIGH_NOT_ALLOWED, parse_mode="HTML")
+            return
+        reward = HIGH_POINT_REWARD
+        emoji = "💎"
+        point_name = "سلام گلم پوینت"
+
+    # 6) بالای ۲۰۰۰۰۰ → کیک
+    elif exact_match == TOP_WORD:
+        if current_total < TOP_THRESHOLD:
+            await message.reply_text(TOP_NOT_ALLOWED, parse_mode="HTML")
+            return
+        reward = TOP_POINT_REWARD
+        emoji = "🍰"
+        point_name = "کیک پوینت"
+
+    # ===== چک کول‌داون =====
+    can, remaining = can_claim(user.id, KIR_POINT_COOLDOWN)
+
+    if not can:
+        minutes = remaining // 60
+        seconds = remaining % 60
+        await message.reply_text(
+            f"⏳ <b>صبر کن</b> ⏳\n\n"
+            f"{emoji} <b>{point_name} هات :</b> {current_total}\n\n"
+            f"⏰ <b>{minutes} دقیقه و {seconds} ثانیه</b> دیگه می‌تونی دوباره بگیری",
+            parse_mode="HTML",
+        )
+        return
+
+    new_total = add_points(user.id, reward)
+
+    await message.reply_text(
+        f"{emoji} <b>{reward} {point_name} گرفتی</b> {emoji}\n\n"
+        f"💰 <b>{point_name} هات :</b> {new_total}\n\n"
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
+        parse_mode="HTML",
+    )
