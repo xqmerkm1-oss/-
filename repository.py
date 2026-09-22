@@ -12,24 +12,54 @@ async def get_or_create_user(
     telegram_id: int,
     username: str | None = None,
     first_name: str | None = None,
-) -> User:
+    invited_by: int | None = None,
+) -> tuple[User, bool]:
+    """کاربر رو می‌گیره یا می‌سازه.
+    مقدار برگشتی: (کاربر, آیا تازه ساخته شد؟)
+    """
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
         )
         user = result.scalar_one_or_none()
 
-        if user is None:
-            user = User(
-                telegram_id=telegram_id,
-                username=username,
-                first_name=first_name,
-            )
-            session.add(user)
-            await session.commit()
-            await session.refresh(user)
+        if user is not None:
+            return user, False
 
-        return user
+        user = User(
+            telegram_id=telegram_id,
+            username=username,
+            first_name=first_name,
+            invited_by=invited_by,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        return user, True
+
+
+async def add_pads(telegram_id: int, amount: int) -> None:
+    """به کاربر پد اضافه می‌کنه."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            user.pads += amount
+            await session.commit()
+
+
+async def increment_invite_count(telegram_id: int) -> None:
+    """تعداد دعوت‌های موفق کاربر رو یکی زیاد می‌کنه."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            user.invite_count += 1
+            await session.commit()
 
 
 async def give_reward(telegram_id: int, points: int) -> User | None:
