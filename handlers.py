@@ -137,7 +137,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # دستورات متنی (بدون اسلش)
+    # ─── دستورات متنی (بدون اسلش) ───
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -148,10 +148,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await top_handler(update, context)
         return
 
-    # کلمات کلیدی جایزه‌دار
+    # ─── 🎯 فقط پیام‌های تک‌کلمه‌ای جایزه می‌گیرن ───
+    if " " in text or "\n" in text or "\t" in text:
+        return
+
+    # ─── چک کن آیا این تک‌کلمه، یکی از کلمات کلیدی هست ───
     matched: tuple[str, tuple[int, str]] | None = None
     for keyword, reward in KEYWORDS.items():
-        if keyword in text:
+        if keyword == text:  # فقط تطابق کامل
             matched = (keyword, reward)
             break
 
@@ -160,20 +164,19 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     keyword, (points, title) = matched
 
-    # گرفتن یا ساخت کاربر
+    # ─── گرفتن یا ساخت کاربر ───
     try:
         db_user = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
 
-    # چک کردن کول‌داون
+    # ─── چک کردن کول‌داون ───
     remaining = seconds_remaining(db_user)
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
 
-        # ساخت متن زمان: دقیقه و ثانیه
         if minutes > 0 and secs > 0:
             wait_text = f"{minutes} دقیقه و {secs} ثانیه"
         elif minutes > 0:
@@ -188,7 +191,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # دادن جایزه
+    # ─── دادن جایزه ───
     try:
         updated = await give_reward(user.id, points, title)
     except Exception as exc:
