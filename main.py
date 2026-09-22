@@ -2,7 +2,6 @@ import logging
 
 from telegram import Update
 from telegram.ext import (
-    AIORateLimiter,
     Application,
     CommandHandler,
     MessageHandler,
@@ -29,7 +28,6 @@ def build_application() -> Application:
     app = (
         Application.builder()
         .token(BOT_TOKEN)
-        .rate_limiter(AIORateLimiter(max_rate=25, time_period=1.0))
         .post_init(on_startup)
         .build()
     )
