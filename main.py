@@ -38,20 +38,13 @@ def build_application() -> Application:
         .build()
     )
 
-    # دکمه «عضو شدم»
     app.add_handler(
         CallbackQueryHandler(check_membership_callback, pattern="^check_membership$")
     )
-
-    # دکمه‌های منو (حساب من، فروشگاه، برترها، دعوت دوستان، بازگشت)
     app.add_handler(
         CallbackQueryHandler(menu_callback, pattern="^menu_")
     )
-
-    # /start
     app.add_handler(CommandHandler("start", start_handler))
-
-    # پیام‌های متنی
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
     )
