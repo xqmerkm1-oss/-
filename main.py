@@ -13,6 +13,7 @@ from config import BOT_TOKEN
 from database import init_db
 from handlers import (
     check_membership_callback,
+    menu_callback,
     start_handler,
     text_handler,
 )
@@ -37,15 +38,20 @@ def build_application() -> Application:
         .build()
     )
 
-    # دکمه‌ی «عضو شدم»
+    # دکمه «عضو شدم»
     app.add_handler(
         CallbackQueryHandler(check_membership_callback, pattern="^check_membership$")
+    )
+
+    # دکمه‌های منو (حساب من، فروشگاه، برترها، دعوت دوستان، بازگشت)
+    app.add_handler(
+        CallbackQueryHandler(menu_callback, pattern="^menu_")
     )
 
     # /start
     app.add_handler(CommandHandler("start", start_handler))
 
-    # همه‌ی پیام‌های متنی
+    # پیام‌های متنی
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
     )
