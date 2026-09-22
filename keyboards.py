@@ -1,32 +1,20 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def _btn(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
-    """دکمه با پشتیبانی اختیاری از style (اگه نسخه کتابخانه اجازه بده)."""
-    kwargs = {"text": text, "url": url}
-    if style is not None:
-        try:
-            return InlineKeyboardButton(**kwargs, style=style)
-        except TypeError:
-            # نسخه قدیمی کتابخانه — بدون رنگ
-            return InlineKeyboardButton(**kwargs)
-    return InlineKeyboardButton(**kwargs)
-
-
 def start_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
         [
-            _btn(
+            InlineKeyboardButton(
                 "➕ افزودن به گروه",
-                "https://t.me/Schompedbot?startgroup=true",
-                style="success",  # 🟢
+                url="https://t.me/Schompedbot?startgroup=true",
+                style="success",  # 🟢 سبز
             )
         ],
         [
-            _btn(
+            InlineKeyboardButton(
                 "📢 کانال اطلاع رسانی",
-                "https://t.me/SchompedCanal",
-                style="primary",  # 🔵
+                url="https://t.me/SchompedCanal",
+                style="primary",  # 🔵 آبی
             )
         ],
     ]
