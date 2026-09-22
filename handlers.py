@@ -10,27 +10,27 @@ from repository import (
     get_or_create_user,
     get_top_users,
     give_reward,
+    mark_bread_used,
     seconds_remaining,
 )
 
 logger = logging.getLogger(__name__)
 
 
-# 🎯 آی‌دی کانال عضویت اجباری
 CHANNEL_ID = -1004372622419
 CHANNEL_LINK = "https://t.me/SchompedCanal"
 
 
-# 🎁 کلمات کلیدی: {کلمه: (پد, حداقل پد لازم برای باز شدن)}
+# 🎁 کلمات کلیدی: {کلمه: (پد, حداقل پد)}
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
-    "دختر خوب": (5, 500),
-    "پسر خوب": (5, 500),
-    "نون بربری": (5, 0),
-    "آجرلر": (3, 0),
+    "شمع": (5, 0),
     "سیفید": (5, 0),
     "شومپد": (7, 0),
-    "شمع": (5, 0),
+    "دختر خوب": (5, 500),
+    "پسر خوب": (5, 500),
+    "نون بربری": (5, 1000),
+    "آجر": (5, 3000),
 }
 
 CMD_HELP = "راهنما"
@@ -39,7 +39,6 @@ CMD_TOP = "برترها"
 
 
 async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
-    """چک می‌کنه کاربر واقعاً عضو کانال هست یا نه."""
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         status = member.status
@@ -59,9 +58,6 @@ def join_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-# ─────────────────────────────────────────────
-# /start
-# ─────────────────────────────────────────────
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
@@ -89,9 +85,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
-# ─────────────────────────────────────────────
-# عضویت اجباری
-# ─────────────────────────────────────────────
 async def check_membership_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -127,9 +120,6 @@ async def check_membership_callback(
     )
 
 
-# ─────────────────────────────────────────────
-# دکمه‌های منوی اصلی
-# ─────────────────────────────────────────────
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None:
@@ -151,7 +141,13 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── حساب من ───
+    if data == "menu_close":
+        try:
+            await query.message.delete()
+        except Exception as exc:
+            logger.exception("Delete error: %s", exc)
+        return
+
     if data == "menu_profile":
         try:
             db_user = await get_or_create_user(user.id, user.username, user.first_name)
@@ -176,11 +172,19 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         username = f"@{db_user.username}" if db_user.username else "ندارد"
         name = db_user.first_name or "دوست عزیز"
 
-        if db_user.pads >= 500:
+        if db_user.pads >= 3000:
+            unlock_status = "✅ همه کلمات باز شده!"
+        elif db_user.pads >= 1000:
+            unlock_status = "✅ <b>نون بربری</b> باز شده!"
+        elif db_user.pads >= 500:
             unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
         else:
             needed = 500 - db_user.pads
             unlock_status = f"🔒 {needed} پد دیگه تا باز شدن <b>دختر خوب</b> و <b>پسر خوب</b>"
+
+        bread_status = ""
+        if db_user.bread_used:
+            bread_status = "\n⚠️ چون <b>نون بربری</b> زدی، <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
         await query.edit_message_text(
             f"👤 <b>حساب من</b>\n\n"
@@ -189,14 +193,13 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"🔗 یوزرنیم: <b>{username}</b>\n"
             f"💎 پدها: <b>{db_user.pads}</b>\n"
             f"⏳ وضعیت جایزه: {cooldown}\n\n"
-            f"{unlock_status}\n\n"
+            f"{unlock_status}{bread_status}\n\n"
             f"📅 عضویت از: <b>{db_user.created_at.strftime('%Y-%m-%d') if db_user.created_at else '---'}</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
         return
 
-    # ─── فروشگاه ───
     if data == "menu_shop":
         await query.edit_message_text(
             "🛒 <b>فروشگاه شومپد</b>\n\n"
@@ -207,7 +210,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── برترها ───
     if data == "menu_top":
         try:
             top_users = await get_top_users(10)
@@ -236,7 +238,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── دعوت دوستان ───
     if data == "menu_invite":
         await query.edit_message_text(
             "🎁 <b>دعوت دوستان</b>\n\n"
@@ -248,9 +249,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
 
-# ─────────────────────────────────────────────
-# راهنما، پروفایل، برترها
-# ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -289,11 +287,19 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     name = db_user.first_name or "دوست عزیز"
     username = f"@{db_user.username}" if db_user.username else "ندارد"
 
-    if db_user.pads >= 500:
+    if db_user.pads >= 3000:
+        unlock_status = "✅ همه کلمات باز شده!"
+    elif db_user.pads >= 1000:
+        unlock_status = "✅ <b>نون بربری</b> باز شده!"
+    elif db_user.pads >= 500:
         unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
     else:
         needed = 500 - db_user.pads
         unlock_status = f"🔒 {needed} پد دیگه تا باز شدن <b>دختر خوب</b> و <b>پسر خوب</b>"
+
+    bread_status = ""
+    if db_user.bread_used:
+        bread_status = "\n⚠️ چون <b>نون بربری</b> زدی، <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
     await update.message.reply_text(
         f"👤 <b>حساب من</b>\n\n"
@@ -302,7 +308,7 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"🔗 یوزرنیم: <b>{username}</b>\n"
         f"💎 پدها: <b>{db_user.pads}</b>\n"
         f"⏳ وضعیت: {cooldown}\n\n"
-        f"{unlock_status}",
+        f"{unlock_status}{bread_status}",
         parse_mode=ParseMode.HTML,
     )
 
@@ -333,9 +339,6 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
-# ─────────────────────────────────────────────
-# کلمات کلیدی
-# ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -369,7 +372,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logger.exception("DB error: %s", exc)
         return
 
-    # ─── چک کردن قفل ───
+    # قفل مخصوص: اگه نون بربری زده، دختر خوب و پسر خوب رو نتونه
+    if text in ("دختر خوب", "پسر خوب") and db_user.bread_used:
+        await update.message.reply_text(
+            "🔒 چون <b>نون بربری</b> زدی، دیگه نمی‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> بزنی!",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
     if db_user.pads < required_pads:
         needed = required_pads - db_user.pads
         await update.message.reply_text(
@@ -382,7 +392,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # ─── چک کول‌داون ───
     remaining = seconds_remaining(db_user)
     if remaining > 0:
         minutes = remaining // 60
@@ -401,7 +410,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # ─── دادن پد ───
     try:
         updated = await give_reward(user.id, points)
     except Exception as exc:
@@ -411,13 +419,25 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
+    bread_msg = ""
+    if text == "نون بربری":
+        try:
+            await mark_bread_used(user.id)
+            bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+
     unlock_msg = ""
     if updated.pads >= 500 and db_user.pads < 500:
         unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> هم بزنی!"
+    elif updated.pads >= 1000 and db_user.pads < 1000:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>نون بربری</b> هم بزنی!"
+    elif updated.pads >= 3000 and db_user.pads < 3000:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>آجر</b> هم بزنی!"
 
     await update.message.reply_text(
         f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
         f"💎 پد هات : <b>{updated.pads}</b>\n\n"
-        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{unlock_msg}",
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{unlock_msg}{bread_msg}",
         parse_mode=ParseMode.HTML,
     )
