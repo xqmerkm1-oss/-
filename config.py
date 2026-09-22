@@ -6,7 +6,7 @@ load_dotenv()
 BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://shomped:shomped@db:5432/shomped",
+    "8900397795:AAGcpe7E-qavZYXmIJlHsD4s9Li5_VkM2_8",
 )
 
 if not BOT_TOKEN:
