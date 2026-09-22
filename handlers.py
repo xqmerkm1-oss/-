@@ -141,7 +141,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if user is None:
         return
 
-    data = query.data  # menu_profile, menu_shop, menu_top, menu_invite, menu_back
+    data = query.data
 
     # ─── بازگشت به منوی اصلی ───
     if data == "menu_back":
