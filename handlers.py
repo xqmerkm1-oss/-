@@ -1,7 +1,7 @@
 import logging
 
-from telegram import Update
-from telegram.constants import ParseMode
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode, ChatMemberStatus
 from telegram.ext import ContextTypes
 
 from keyboards import help_keyboard, start_keyboard
@@ -16,16 +16,21 @@ from repository import (
 logger = logging.getLogger(__name__)
 
 
+# 🎯 آی‌دی کانال عضویت اجباری
+CHANNEL_ID = -1004372622419
+CHANNEL_LINK = "https://t.me/SchompedCanal"
+
+
 # 🎁 کلمات کلیدی: {کلمه: (پوینت, لقب)}
 KEYWORDS: dict[str, tuple[int, str]] = {
     "گل رز": (10, "رزیتا 🌹"),
     "دختر خوب": (10, "دختر خوب 🌸"),
     "پسر خوب": (10, "پسر خوب 🌟"),
-    "نان بربری": (5, "نانوا 🥖"),
     "نون بربری": (5, "نانوا 🥖"),
-    "آجور": (3, "آجورخور 🥒"),
+    "آجور": (3, "آجورخور 🧱"),
     "سیفید": (5, "سفیدبرفی ⚪"),
     "شومپد": (7, "شومپدی 🤖"),
+    "شمع": (5, "شمع‌ساز 🕯️"),
 }
 
 # دستورات متنی (بدون اسلش)
@@ -34,17 +39,103 @@ CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
 
 
+async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+    """چک می‌کنه کاربر واقعاً عضو کانال هست یا نه."""
+    try:
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        # اگه عضو بود (member/admin/creator) → True
+        if member.status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.CREATOR,
+        ):
+            return True
+        return False
+    except Exception as exc:
+        logger.exception("get_chat_member error: %s", exc)
+        # اگه خطا داد، اجازه بده ادامه بده (تا کاربر گیر نکنه)
+        return False
+
+
+def join_keyboard() -> InlineKeyboardMarkup:
+    """دکمه‌های عضویت اجباری."""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📢 عضویت در کانال",
+                url=CHANNEL_LINK,
+                style="primary",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "✅ عضو شدم",
+                callback_data="check_membership",
+                style="success",
+            )
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
         return
 
+    # چک عضویت
+    if not await is_user_member(context, user.id):
+        await update.message.reply_text(
+            "🔒 <b>برای استفاده از ربات شومپد، اول باید توی کانال ما عضو بشی!</b>\n\n"
+            "📢 روی دکمه زیر بزن و عضو شو، بعد روی «✅ عضو شدم» بزن:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=join_keyboard(),
+        )
+        return
+
+    # اگه عضو بود
     try:
         await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
 
     await update.message.reply_text(
+        START_TEXT,
+        parse_mode=ParseMode.HTML,
+        reply_markup=start_keyboard(),
+        disable_web_page_preview=True,
+    )
+
+
+async def check_membership_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """وقتی کاربر روی «✅ عضو شدم» می‌زنه."""
+    query = update.callback_query
+    if query is None:
+        return
+
+    await query.answer()
+
+    user = query.from_user
+    if user is None:
+        return
+
+    # چک عضویت
+    if not await is_user_member(context, user.id):
+        await query.answer(
+            "❌ هنوز عضو کانال نشدی! اول عضو شو، بعد دوباره امتحان کن.",
+            show_alert=True,
+        )
+        return
+
+    # عضو شده → ساخت کاربر و ویرایش پیام به منوی اصلی
+    try:
+        await get_or_create_user(user.id, user.username, user.first_name)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+
+    await query.edit_message_text(
         START_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=start_keyboard(),
@@ -155,7 +246,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # ─── چک کن آیا این تک‌کلمه، یکی از کلمات کلیدی هست ───
     matched: tuple[str, tuple[int, str]] | None = None
     for keyword, reward in KEYWORDS.items():
-        if keyword == text:  # فقط تطابق کامل
+        if keyword == text:
             matched = (keyword, reward)
             break
 
@@ -201,7 +292,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    # 🎯 پیام جدید: «۵ سیفید پوینت گرفتی»
     await update.message.reply_text(
         f"🎉 <b>{points} {keyword} پوینت گرفتی</b>\n\n"
         f"💎 پد هات : <b>{updated.pads}</b>\n"
