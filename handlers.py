@@ -39,6 +39,7 @@ CMD_TOP = "برترها"
 
 
 async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+    """چک می‌کنه کاربر واقعاً عضو کانال هست یا نه."""
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         status = member.status
@@ -58,6 +59,9 @@ def join_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+# ─────────────────────────────────────────────
+# /start
+# ─────────────────────────────────────────────
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
@@ -85,6 +89,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
+# ─────────────────────────────────────────────
+# عضویت اجباری
+# ─────────────────────────────────────────────
 async def check_membership_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -120,6 +127,9 @@ async def check_membership_callback(
     )
 
 
+# ─────────────────────────────────────────────
+# دکمه‌های منوی اصلی
+# ─────────────────────────────────────────────
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None:
@@ -255,6 +265,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
 
+# ─────────────────────────────────────────────
+# راهنما، پروفایل، برترها (دستور متنی)
+# ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -351,6 +364,9 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+# ─────────────────────────────────────────────
+# کلمات کلیدی و دستورات متنی
+# ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -360,6 +376,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
+    # ─── دستورات متنی (بدون اسلش) ───
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -370,20 +387,20 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await top_handler(update, context)
         return
 
-    if " " in text or "\n" in text or "\t" in text:
-        return
-
+    # ─── 🎯 تطابق کامل با کلمات کلیدی (نه substring) ───
     if text not in KEYWORDS:
         return
 
     points, required_pads = KEYWORDS[text]
 
+    # ─── گرفتن یا ساخت کاربر ───
     try:
         db_user = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
 
+    # ─── قفل مخصوص: اگه نون بربری زده، دختر خوب و پسر خوب رو نتونه ───
     if text in ("دختر خوب", "پسر خوب") and db_user.bread_used:
         await update.message.reply_text(
             "🔒 چون <b>نون بربری</b> زدی، دیگه نمی‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> بزنی!",
@@ -391,6 +408,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    # ─── چک کردن قفل پد ───
     if db_user.pads < required_pads:
         needed = required_pads - db_user.pads
         await update.message.reply_text(
@@ -403,6 +421,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    # ─── چک کول‌داون ───
     remaining = seconds_remaining(db_user)
     if remaining > 0:
         minutes = remaining // 60
@@ -421,6 +440,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    # ─── دادن پد ───
     try:
         updated = await give_reward(user.id, points)
     except Exception as exc:
