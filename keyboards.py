@@ -1,7 +1,12 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def _btn(text: str, url: str | None = None, callback_data: str | None = None, style: str | None = None) -> InlineKeyboardButton:
+def _btn(
+    text: str,
+    url: str | None = None,
+    callback_data: str | None = None,
+    style: str | None = None,
+) -> InlineKeyboardButton:
     kwargs = {"text": text}
     if url is not None:
         kwargs["url"] = url
@@ -41,10 +46,8 @@ def back_keyboard() -> InlineKeyboardMarkup:
 
 
 def help_keyboard() -> InlineKeyboardMarkup:
+    """توی راهنما فقط دکمه بستن هست."""
     keyboard = [
-        [
-            _btn("➕ افزودن به گروه", url="https://t.me/Schompedbot?startgroup=true", style="success"),
-            _btn("📢 کانال اطلاع رسانی", url="https://t.me/SchompedCanal", style="primary"),
-        ],
+        [_btn("🔙 بستن", callback_data="menu_close", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
