@@ -22,6 +22,12 @@ class User(Base):
         Boolean, default=False, nullable=False
     )
 
+    # 🆕 سیستم دعوت
+    invited_by: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, default=None
+    )
+    invite_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     last_reward_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
