@@ -16,7 +16,7 @@ from repository import (
 logger = logging.getLogger(__name__)
 
 
-# 🎁 کلمات کلیدی: {کلمه: (پد, لقب)}
+# 🎁 کلمات کلیدی: {کلمه: (پوینت, لقب)}
 KEYWORDS: dict[str, tuple[int, str]] = {
     "گل رز": (10, "رزیتا 🌹"),
     "دختر خوب": (10, "دختر خوب 🌸"),
@@ -201,8 +201,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
+    # 🎯 پیام جدید: «۵ سیفید پوینت گرفتی»
     await update.message.reply_text(
-        f"🎉 <b>+{points} {keyword} پد گرفتی</b>\n\n"
+        f"🎉 <b>{points} {keyword} پوینت گرفتی</b>\n\n"
         f"💎 پد هات : <b>{updated.pads}</b>\n"
         f"🏆 لقبت : <b>{title}</b>\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
