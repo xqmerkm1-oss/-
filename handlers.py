@@ -27,7 +27,7 @@ KEYWORDS: dict[str, int] = {
     "دختر خوب": 10,
     "پسر خوب": 10,
     "نون بربری": 5,
-    "آجورلو": 3,
+    "آجرلر": 3,
     "سیفید": 5,
     "شومپد": 7,
     "شمع": 5,
@@ -345,7 +345,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if " " in text or "\n" in text or "\t" in text:
         return
 
-    # فقط تطابق کامل با کلمات کلیدی
     if text not in KEYWORDS:
         return
 
