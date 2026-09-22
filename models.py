@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -17,7 +17,10 @@ class User(Base):
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     pads: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    title: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+
+    bread_used: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     last_reward_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
