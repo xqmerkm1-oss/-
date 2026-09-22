@@ -1,5 +1,4 @@
 import logging
-import random
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -79,7 +78,12 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
-        cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه تا جایزه بعدی"
+        if minutes > 0 and secs > 0:
+            cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه تا جایزه بعدی"
+        elif minutes > 0:
+            cooldown = f"⏳ {minutes} دقیقه تا جایزه بعدی"
+        else:
+            cooldown = f"⏳ {secs} ثانیه تا جایزه بعدی"
     else:
         cooldown = "✅ آماده‌ی گرفتن جایزه‌ای!"
 
@@ -168,14 +172,18 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
-        if minutes > 0:
+
+        # ساخت متن زمان: دقیقه و ثانیه
+        if minutes > 0 and secs > 0:
+            wait_text = f"{minutes} دقیقه و {secs} ثانیه"
+        elif minutes > 0:
             wait_text = f"{minutes} دقیقه"
         else:
             wait_text = f"{secs} ثانیه"
 
         await update.message.reply_text(
-            f"😅 می‌بینم که تازه وارد و عجولی شومپدی!\n\n"
-            f"⏳ باید <b>{wait_text}</b> دیگه منتظر بمونی تا بتونی دستور بزنی",
+            f"😅 می‌بینم که خوشت اومده!\n\n"
+            f"⏳ باید <b>{wait_text}</b> دیگه منتظر بمونی تا بتونی <b>{keyword}</b> بگیری!",
             parse_mode=ParseMode.HTML,
         )
         return
