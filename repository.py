@@ -32,8 +32,8 @@ async def get_or_create_user(
         return user
 
 
-async def give_reward(telegram_id: int, points: int, title: str) -> User | None:
-    """پد و لقب رو آپدیت می‌کنه و زمان آخرین جایزه رو ذخیره می‌کنه."""
+async def give_reward(telegram_id: int, points: int) -> User | None:
+    """پد رو آپدیت می‌کنه و زمان آخرین جایزه رو ذخیره می‌کنه."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -43,7 +43,6 @@ async def give_reward(telegram_id: int, points: int, title: str) -> User | None:
             return None
 
         user.pads += points
-        user.title = title
         user.last_reward_at = datetime.now(timezone.utc)
         await session.commit()
         await session.refresh(user)
