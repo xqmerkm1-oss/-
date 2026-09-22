@@ -21,16 +21,17 @@ CHANNEL_ID = -1004372622419
 CHANNEL_LINK = "https://t.me/SchompedCanal"
 
 
-# 🎁 کلمات کلیدی: {کلمه: پد}
-KEYWORDS: dict[str, int] = {
-    "گل رز": 10,
-    "دختر خوب": 10,
-    "پسر خوب": 10,
-    "نون بربری": 5,
-    "آجرلر": 3,
-    "سیفید": 5,
-    "شومپد": 7,
-    "شمع": 5,
+# 🎁 کلمات کلیدی: {کلمه: (پد, حداقل پد لازم برای باز شدن)}
+# حداقل پد = 0 → همیشه آزاد
+KEYWORDS: dict[str, tuple[int, int]] = {
+    "گل رز": (2, 0),
+    "دختر خوب": (5, 500),
+    "پسر خوب": (5, 500),
+    "نون بربری": (5, 0),
+    "آجرلر": (3, 0),
+    "سیفید": (5, 0),
+    "شومپد": (7, 0),
+    "شمع": (5, 0),
 }
 
 CMD_HELP = "راهنما"
@@ -142,7 +143,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
-    # ─── بازگشت به منوی اصلی ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -177,6 +177,14 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         username = f"@{db_user.username}" if db_user.username else "ندارد"
         name = db_user.first_name or "دوست عزیز"
 
+        # نمایش وضعیت قفل کلمات
+        unlock_status = ""
+        if db_user.pads >= 500:
+            unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
+        else:
+            needed = 500 - db_user.pads
+            unlock_status = f"🔒 {needed} پد دیگه تا باز شدن <b>دختر خوب</b> و <b>پسر خوب</b>"
+
         await query.edit_message_text(
             f"👤 <b>حساب من</b>\n\n"
             f"📛 نام: <b>{name}</b>\n"
@@ -184,6 +192,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"🔗 یوزرنیم: <b>{username}</b>\n"
             f"💎 پدها: <b>{db_user.pads}</b>\n"
             f"⏳ وضعیت جایزه: {cooldown}\n\n"
+            f"{unlock_status}\n\n"
             f"📅 عضویت از: <b>{db_user.created_at.strftime('%Y-%m-%d') if db_user.created_at else '---'}</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
@@ -243,7 +252,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ─────────────────────────────────────────────
-# راهنما، پروفایل، برترها (دستور متنی)
+# راهنما، پروفایل، برترها
 # ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
@@ -283,13 +292,20 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     name = db_user.first_name or "دوست عزیز"
     username = f"@{db_user.username}" if db_user.username else "ندارد"
 
+    if db_user.pads >= 500:
+        unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
+    else:
+        needed = 500 - db_user.pads
+        unlock_status = f"🔒 {needed} پد دیگه تا باز شدن <b>دختر خوب</b> و <b>پسر خوب</b>"
+
     await update.message.reply_text(
         f"👤 <b>حساب من</b>\n\n"
         f"📛 نام: <b>{name}</b>\n"
         f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
         f"🔗 یوزرنیم: <b>{username}</b>\n"
         f"💎 پدها: <b>{db_user.pads}</b>\n"
-        f"⏳ وضعیت: {cooldown}",
+        f"⏳ وضعیت: {cooldown}\n\n"
+        f"{unlock_status}",
         parse_mode=ParseMode.HTML,
     )
 
@@ -321,7 +337,7 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 # ─────────────────────────────────────────────
-# کلمات کلیدی و دستورات متنی
+# کلمات کلیدی
 # ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
@@ -348,7 +364,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if text not in KEYWORDS:
         return
 
-    points = KEYWORDS[text]
+    points, required_pads = KEYWORDS[text]
 
     try:
         db_user = await get_or_create_user(user.id, user.username, user.first_name)
@@ -356,6 +372,20 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logger.exception("DB error: %s", exc)
         return
 
+    # ─── چک کردن قفل ───
+    if db_user.pads < required_pads:
+        needed = required_pads - db_user.pads
+        await update.message.reply_text(
+            f"🔒 <b>{text}</b> هنوز برات باز نشده!\n\n"
+            f"💎 پدهای فعلی: <b>{db_user.pads}</b>\n"
+            f"🎯 برای باز شدن <b>{text}</b>، باید حداقل <b>{required_pads}</b> پد داشته باشی.\n\n"
+            f"📉 <b>{needed} پد</b> دیگه لازم داری.\n\n"
+            f"💡 فقط با <b>گل رز</b> (۲ پد) می‌تونی پد جمع کنی!",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # ─── چک کول‌داون ───
     remaining = seconds_remaining(db_user)
     if remaining > 0:
         minutes = remaining // 60
@@ -374,6 +404,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    # ─── دادن پد ───
     try:
         updated = await give_reward(user.id, points)
     except Exception as exc:
@@ -383,9 +414,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
+    # اگه همین الان به ۵۰۰ رسید، پیام باز شدن بده
+    unlock_msg = ""
+    if updated.pads >= 500 and db_user.pads < 500:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> هم بزنی!"
+
     await update.message.reply_text(
         f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
         f"💎 پد هات : <b>{updated.pads}</b>\n\n"
-        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{unlock_msg}",
         parse_mode=ParseMode.HTML,
     )
