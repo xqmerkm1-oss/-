@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import desc, select
 
@@ -47,6 +47,18 @@ async def give_reward(telegram_id: int, points: int) -> User | None:
         await session.commit()
         await session.refresh(user)
         return user
+
+
+async def mark_bread_used(telegram_id: int) -> None:
+    """پرچم نون بربری رو True می‌کنه."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            user.bread_used = True
+            await session.commit()
 
 
 def seconds_remaining(user: User) -> int:
