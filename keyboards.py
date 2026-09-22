@@ -1,8 +1,12 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def _btn(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
-    kwargs = {"text": text, "url": url}
+def _btn(text: str, url: str | None = None, callback_data: str | None = None, style: str | None = None) -> InlineKeyboardButton:
+    kwargs = {"text": text}
+    if url is not None:
+        kwargs["url"] = url
+    if callback_data is not None:
+        kwargs["callback_data"] = callback_data
     if style is not None:
         try:
             return InlineKeyboardButton(**kwargs, style=style)
@@ -13,20 +17,28 @@ def _btn(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
 
 def start_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
+        # دکمه‌های اصلی
         [
-            _btn(
-                "➕ افزودن به گروه",
-                "https://t.me/Schompedbot?startgroup=true",
-                style="success",
-            )
+            _btn("➕ افزودن به گروه", url="https://t.me/Schompedbot?startgroup=true", style="success"),
+            _btn("📢 کانال اطلاع رسانی", url="https://t.me/SchompedCanal", style="primary"),
+        ],
+        # دکمه‌های جدید
+        [
+            _btn("👤 حساب من", callback_data="menu_profile", style="primary"),
+            _btn("🛒 فروشگاه", callback_data="menu_shop", style="primary"),
         ],
         [
-            _btn(
-                "📢 کانال اطلاع رسانی",
-                "https://t.me/SchompedCanal",
-                style="primary",
-            )
+            _btn("🏆 برترها", callback_data="menu_top", style="success"),
+            _btn("🎁 دعوت دوستان", callback_data="menu_invite", style="success"),
         ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def back_keyboard() -> InlineKeyboardMarkup:
+    """دکمه بازگشت به منوی اصلی."""
+    keyboard = [
+        [_btn("🔙 بازگشت", callback_data="menu_back", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -34,16 +46,8 @@ def start_keyboard() -> InlineKeyboardMarkup:
 def help_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
         [
-            _btn(
-                "➕ افزودن به گروه",
-                "https://t.me/Schompedbot?startgroup=true",
-                style="success",
-            ),
-            _btn(
-                "📢 کانال اطلاع رسانی",
-                "https://t.me/SchompedCanal",
-                style="primary",
-            ),
+            _btn("➕ افزودن به گروه", url="https://t.me/Schompedbot?startgroup=true", style="success"),
+            _btn("📢 کانال اطلاع رسانی", url="https://t.me/SchompedCanal", style="primary"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
