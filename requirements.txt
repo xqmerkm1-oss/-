@@ -1,4 +1,4 @@
-python-telegram-bot==21.6
+python-telegram-bot>=22.7
 SQLAlchemy==2.0.35
 asyncpg==0.29.0
 python-dotenv==1.0.1
