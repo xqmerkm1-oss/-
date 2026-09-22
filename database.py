@@ -9,16 +9,13 @@ from config import DATABASE_URL
 
 
 def _normalize_db_url(url: str) -> str:
-    """URL رو به فرمت asyncpg تبدیل می‌کنه."""
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://", 1)
     elif url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-    # حذف پارامترهایی که asyncpg باهاشون مشکل داره
     if "?" in url:
         base, _, query = url.partition("?")
-        # فقط پارامترهای مفید رو نگه دار
         keep = [
             p
             for p in query.split("&")
