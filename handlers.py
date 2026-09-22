@@ -22,7 +22,6 @@ CHANNEL_LINK = "https://t.me/SchompedCanal"
 
 
 # 🎁 کلمات کلیدی: {کلمه: (پد, حداقل پد لازم برای باز شدن)}
-# حداقل پد = 0 → همیشه آزاد
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
     "دختر خوب": (5, 500),
@@ -177,8 +176,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         username = f"@{db_user.username}" if db_user.username else "ندارد"
         name = db_user.first_name or "دوست عزیز"
 
-        # نمایش وضعیت قفل کلمات
-        unlock_status = ""
         if db_user.pads >= 500:
             unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
         else:
@@ -414,7 +411,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    # اگه همین الان به ۵۰۰ رسید، پیام باز شدن بده
     unlock_msg = ""
     if updated.pads >= 500 and db_user.pads < 500:
         unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> هم بزنی!"
