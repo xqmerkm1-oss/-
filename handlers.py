@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from keyboards import help_keyboard, start_keyboard
+from keyboards import back_keyboard, help_keyboard, start_keyboard
 from messages import HELP_TEXT, START_TEXT
 from repository import (
     get_or_create_user,
@@ -33,7 +33,6 @@ KEYWORDS: dict[str, tuple[int, str]] = {
     "شمع": (5, "شمع‌ساز 🕯️"),
 }
 
-# دستورات متنی (بدون اسلش)
 CMD_HELP = "راهنما"
 CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
@@ -49,37 +48,25 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         return False
     except Exception as exc:
         logger.exception("get_chat_member error: %s", exc)
-        # اگه ربات ادمین نباشه یا خطا داد، کاربر رو رد کن تا گیر نکنه
         return True
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های عضویت اجباری."""
     keyboard = [
-        [
-            InlineKeyboardButton(
-                "📢 عضویت در کانال",
-                url=CHANNEL_LINK,
-                style="primary",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "✅ عضو شدم",
-                callback_data="check_membership",
-                style="success",
-            )
-        ],
+        [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK, style="primary")],
+        [InlineKeyboardButton("✅ عضو شدم", callback_data="check_membership", style="success")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
+# ─────────────────────────────────────────────
+# /start
+# ─────────────────────────────────────────────
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
         return
 
-    # چک عضویت
     if not await is_user_member(context, user.id):
         await update.message.reply_text(
             "🔒 <b>برای استفاده از ربات شومپد، اول باید توی کانال ما عضو بشی!</b>\n\n"
@@ -89,7 +76,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # اگه عضو بود
     try:
         await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
@@ -103,10 +89,12 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
+# ─────────────────────────────────────────────
+# عضویت اجباری
+# ─────────────────────────────────────────────
 async def check_membership_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """وقتی کاربر روی «✅ عضو شدم» می‌زنه."""
     query = update.callback_query
     if query is None:
         return
@@ -116,9 +104,7 @@ async def check_membership_callback(
         await query.answer()
         return
 
-    # چک عضویت
     if not await is_user_member(context, user.id):
-        # 🎯 پنجره هشدار — کاربر باید اول عضو بشه
         await query.answer(
             "😤 کوندبازی در نیار یارو!\n\n"
             "اول برو توی کانال عضو شو، بعد دوباره روی «✅ عضو شدم» بزن.",
@@ -126,10 +112,8 @@ async def check_membership_callback(
         )
         return
 
-    # عضو شده → بستن پنجره لودینگ
     await query.answer("✅ عضویتت تایید شد!")
 
-    # ساخت کاربر و ویرایش پیام به منوی اصلی
     try:
         await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
@@ -143,6 +127,128 @@ async def check_membership_callback(
     )
 
 
+# ─────────────────────────────────────────────
+# دکمه‌های منوی اصلی
+# ─────────────────────────────────────────────
+async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """هندلر همه دکمه‌های callback_data که با menu_ شروع می‌شن."""
+    query = update.callback_query
+    if query is None:
+        return
+
+    await query.answer()
+    user = query.from_user
+    if user is None:
+        return
+
+    data = query.data  # menu_profile, menu_shop, menu_top, menu_invite, menu_back
+
+    # ─── بازگشت به منوی اصلی ───
+    if data == "menu_back":
+        await query.edit_message_text(
+            START_TEXT,
+            parse_mode=ParseMode.HTML,
+            reply_markup=start_keyboard(),
+            disable_web_page_preview=True,
+        )
+        return
+
+    # ─── حساب من ───
+    if data == "menu_profile":
+        try:
+            db_user = await get_or_create_user(user.id, user.username, user.first_name)
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
+            return
+
+        remaining = seconds_remaining(db_user)
+        if remaining > 0:
+            minutes = remaining // 60
+            secs = remaining % 60
+            if minutes > 0 and secs > 0:
+                cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه"
+            elif minutes > 0:
+                cooldown = f"⏳ {minutes} دقیقه"
+            else:
+                cooldown = f"⏳ {secs} ثانیه"
+        else:
+            cooldown = "✅ آماده"
+
+        username = f"@{db_user.username}" if db_user.username else "ندارد"
+        title = db_user.title or "بدون لقب"
+        name = db_user.first_name or "دوست عزیز"
+
+        await query.edit_message_text(
+            f"👤 <b>حساب من</b>\n\n"
+            f"📛 نام: <b>{name}</b>\n"
+            f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
+            f"🔗 یوزرنیم: <b>{username}</b>\n"
+            f"💎 پوینت‌ها: <b>{db_user.pads}</b>\n"
+            f"🏆 لقب: <b>{title}</b>\n"
+            f"⏳ وضعیت جایزه: {cooldown}\n\n"
+            f"📅 عضویت از: <b>{db_user.created_at.strftime('%Y-%m-%d') if db_user.created_at else '---'}</b>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+    # ─── فروشگاه ───
+    if data == "menu_shop":
+        await query.edit_message_text(
+            "🛒 <b>فروشگاه شومپد</b>\n\n"
+            "🚧 این بخش در حال ساخته شدنه!\n\n"
+            "به‌زودی می‌تونی با پوینت‌هات آیتم بخری و قوی‌تر بشی. 💪",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+    # ─── برترها ───
+    if data == "menu_top":
+        try:
+            top_users = await get_top_users(10)
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
+            return
+
+        if not top_users:
+            await query.edit_message_text(
+                "🏆 هنوز کسی پدی نگرفته! 🥲",
+                reply_markup=back_keyboard(),
+            )
+            return
+
+        medals = ["🥇", "🥈", "🥉"] + ["🎖️"] * 7
+        lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
+        for i, u in enumerate(top_users):
+            name = u.first_name or u.username or f"کاربر {u.telegram_id}"
+            title = u.title or "بدون لقب"
+            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پوینت — {title}")
+
+        await query.edit_message_text(
+            "\n".join(lines),
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+    # ─── دعوت دوستان ───
+    if data == "menu_invite":
+        await query.edit_message_text(
+            "🎁 <b>دعوت دوستان</b>\n\n"
+            "🚧 این بخش در حال ساخته شدنه!\n\n"
+            "به‌زودی می‌تونی دوستات رو دعوت کنی و پوینت جایزه بگیری. 🎉",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+
+# ─────────────────────────────────────────────
+# راهنما، پروفایل، برترها (دستور متنی)
+# ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -180,13 +286,16 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     title = db_user.title or "بدون لقب"
     name = db_user.first_name or "دوست عزیز"
+    username = f"@{db_user.username}" if db_user.username else "ندارد"
 
     await update.message.reply_text(
-        f"👤 <b>پروفایل {name}</b>\n\n"
-        f"💎 پدها: <b>{db_user.pads}</b>\n"
+        f"👤 <b>حساب من</b>\n\n"
+        f"📛 نام: <b>{name}</b>\n"
+        f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
+        f"🔗 یوزرنیم: <b>{username}</b>\n"
+        f"💎 پوینت‌ها: <b>{db_user.pads}</b>\n"
         f"🏆 لقب: <b>{title}</b>\n"
-        f"{cooldown}\n\n"
-        f"💡 برای گرفتن پد، یه کلمه‌ی کلیدی بنویس (مثلاً <b>گل رز</b>)",
+        f"⏳ وضعیت: {cooldown}",
         parse_mode=ParseMode.HTML,
     )
 
@@ -210,7 +319,7 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     for i, u in enumerate(top_users):
         name = u.first_name or u.username or f"کاربر {u.telegram_id}"
         title = u.title or "بدون لقب"
-        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پد — {title}")
+        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پوینت — {title}")
 
     await update.message.reply_text(
         "\n".join(lines),
@@ -218,8 +327,10 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+# ─────────────────────────────────────────────
+# کلمات کلیدی و دستورات متنی
+# ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """همه پیام‌های متنی رو بررسی می‌کنه: دستورات متنی + کلمات کلیدی."""
     if not update.message or not update.message.text:
         return
 
@@ -228,7 +339,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # ─── دستورات متنی (بدون اسلش) ───
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -239,11 +349,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await top_handler(update, context)
         return
 
-    # ─── 🎯 فقط پیام‌های تک‌کلمه‌ای جایزه می‌گیرن ───
     if " " in text or "\n" in text or "\t" in text:
         return
 
-    # ─── چک کن آیا این تک‌کلمه، یکی از کلمات کلیدی هست ───
     matched: tuple[str, tuple[int, str]] | None = None
     for keyword, reward in KEYWORDS.items():
         if keyword == text:
@@ -255,19 +363,16 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     keyword, (points, title) = matched
 
-    # ─── گرفتن یا ساخت کاربر ───
     try:
         db_user = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
 
-    # ─── چک کردن کول‌داون ───
     remaining = seconds_remaining(db_user)
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
-
         if minutes > 0 and secs > 0:
             wait_text = f"{minutes} دقیقه و {secs} ثانیه"
         elif minutes > 0:
@@ -282,7 +387,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # ─── دادن جایزه ───
     try:
         updated = await give_reward(user.id, points, title)
     except Exception as exc:
