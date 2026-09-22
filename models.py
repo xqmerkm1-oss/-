@@ -21,6 +21,9 @@ class User(Base):
     warriors: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     pads: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # 🆕 لقب کاربر
+    title: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
