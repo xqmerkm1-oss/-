@@ -21,16 +21,16 @@ CHANNEL_ID = -1004372622419
 CHANNEL_LINK = "https://t.me/SchompedCanal"
 
 
-# 🎁 کلمات کلیدی: {کلمه: (پوینت, لقب)}
-KEYWORDS: dict[str, tuple[int, str]] = {
-    "گل رز": (10, "رزیتا 🌹"),
-    "دختر خوب": (10, "دختر خوب 🌸"),
-    "پسر خوب": (10, "پسر خوب 🌟"),
-    "نون بربری": (5, "نانوا 🥖"),
-    "آجور": (3, "آجورخور 🧱"),
-    "سیفید": (5, "سفیدبرفی ⚪"),
-    "شومپد": (7, "شومپدی 🤖"),
-    "شمع": (5, "شمع‌ساز 🕯️"),
+# 🎁 کلمات کلیدی: {کلمه: پد}
+KEYWORDS: dict[str, int] = {
+    "گل رز": 10,
+    "دختر خوب": 10,
+    "پسر خوب": 10,
+    "نون بربری": 5,
+    "آجورلو": 3,
+    "سیفید": 5,
+    "شومپد": 7,
+    "شمع": 5,
 }
 
 CMD_HELP = "راهنما"
@@ -131,7 +131,6 @@ async def check_membership_callback(
 # دکمه‌های منوی اصلی
 # ─────────────────────────────────────────────
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """هندلر همه دکمه‌های callback_data که با menu_ شروع می‌شن."""
     query = update.callback_query
     if query is None:
         return
@@ -176,7 +175,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             cooldown = "✅ آماده"
 
         username = f"@{db_user.username}" if db_user.username else "ندارد"
-        title = db_user.title or "بدون لقب"
         name = db_user.first_name or "دوست عزیز"
 
         await query.edit_message_text(
@@ -184,8 +182,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"📛 نام: <b>{name}</b>\n"
             f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
             f"🔗 یوزرنیم: <b>{username}</b>\n"
-            f"💎 پوینت‌ها: <b>{db_user.pads}</b>\n"
-            f"🏆 لقب: <b>{title}</b>\n"
+            f"💎 پدها: <b>{db_user.pads}</b>\n"
             f"⏳ وضعیت جایزه: {cooldown}\n\n"
             f"📅 عضویت از: <b>{db_user.created_at.strftime('%Y-%m-%d') if db_user.created_at else '---'}</b>",
             parse_mode=ParseMode.HTML,
@@ -198,7 +195,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(
             "🛒 <b>فروشگاه شومپد</b>\n\n"
             "🚧 این بخش در حال ساخته شدنه!\n\n"
-            "به‌زودی می‌تونی با پوینت‌هات آیتم بخری و قوی‌تر بشی. 💪",
+            "به‌زودی می‌تونی با پدهات آیتم بخری و قوی‌تر بشی. 💪",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
@@ -224,8 +221,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
         for i, u in enumerate(top_users):
             name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-            title = u.title or "بدون لقب"
-            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پوینت — {title}")
+            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پد")
 
         await query.edit_message_text(
             "\n".join(lines),
@@ -239,7 +235,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(
             "🎁 <b>دعوت دوستان</b>\n\n"
             "🚧 این بخش در حال ساخته شدنه!\n\n"
-            "به‌زودی می‌تونی دوستات رو دعوت کنی و پوینت جایزه بگیری. 🎉",
+            "به‌زودی می‌تونی دوستات رو دعوت کنی و پد جایزه بگیری. 🎉",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
@@ -284,7 +280,6 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     else:
         cooldown = "✅ آماده‌ی گرفتن جایزه‌ای!"
 
-    title = db_user.title or "بدون لقب"
     name = db_user.first_name or "دوست عزیز"
     username = f"@{db_user.username}" if db_user.username else "ندارد"
 
@@ -293,8 +288,7 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"📛 نام: <b>{name}</b>\n"
         f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
         f"🔗 یوزرنیم: <b>{username}</b>\n"
-        f"💎 پوینت‌ها: <b>{db_user.pads}</b>\n"
-        f"🏆 لقب: <b>{title}</b>\n"
+        f"💎 پدها: <b>{db_user.pads}</b>\n"
         f"⏳ وضعیت: {cooldown}",
         parse_mode=ParseMode.HTML,
     )
@@ -318,8 +312,7 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
     for i, u in enumerate(top_users):
         name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-        title = u.title or "بدون لقب"
-        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پوینت — {title}")
+        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پد")
 
     await update.message.reply_text(
         "\n".join(lines),
@@ -352,16 +345,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if " " in text or "\n" in text or "\t" in text:
         return
 
-    matched: tuple[str, tuple[int, str]] | None = None
-    for keyword, reward in KEYWORDS.items():
-        if keyword == text:
-            matched = (keyword, reward)
-            break
-
-    if matched is None:
+    # فقط تطابق کامل با کلمات کلیدی
+    if text not in KEYWORDS:
         return
 
-    keyword, (points, title) = matched
+    points = KEYWORDS[text]
 
     try:
         db_user = await get_or_create_user(user.id, user.username, user.first_name)
@@ -382,13 +370,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         await update.message.reply_text(
             f"😅 می‌بینم که خوشت اومده!\n\n"
-            f"⏳ باید <b>{wait_text}</b> دیگه منتظر بمونی تا بتونی <b>{keyword}</b> بگیری!",
+            f"⏳ باید <b>{wait_text}</b> دیگه منتظر بمونی تا بتونی <b>{text}</b> بگیری!",
             parse_mode=ParseMode.HTML,
         )
         return
 
     try:
-        updated = await give_reward(user.id, points, title)
+        updated = await give_reward(user.id, points)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
@@ -397,9 +385,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     await update.message.reply_text(
-        f"🎉 <b>{points} {keyword} پوینت گرفتی</b>\n\n"
-        f"💎 پد هات : <b>{updated.pads}</b>\n"
-        f"🏆 لقبت : <b>{title}</b>\n\n"
+        f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
+        f"💎 پد هات : <b>{updated.pads}</b>\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری",
         parse_mode=ParseMode.HTML,
     )
