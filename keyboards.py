@@ -46,7 +46,6 @@ def back_keyboard() -> InlineKeyboardMarkup:
 
 
 def help_keyboard() -> InlineKeyboardMarkup:
-    """توی راهنما فقط دکمه بستن هست."""
     keyboard = [
         [_btn("🔙 بستن", callback_data="menu_close", style="danger")],
     ]
