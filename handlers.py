@@ -43,7 +43,6 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
     """چک می‌کنه کاربر واقعاً عضو کانال هست یا نه."""
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        # اگه عضو بود (member/admin/creator) → True
         if member.status in (
             ChatMemberStatus.MEMBER,
             ChatMemberStatus.ADMINISTRATOR,
@@ -53,7 +52,6 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         return False
     except Exception as exc:
         logger.exception("get_chat_member error: %s", exc)
-        # اگه خطا داد، اجازه بده ادامه بده (تا کاربر گیر نکنه)
         return False
 
 
@@ -115,21 +113,25 @@ async def check_membership_callback(
     if query is None:
         return
 
-    await query.answer()
-
     user = query.from_user
     if user is None:
+        await query.answer()
         return
 
     # چک عضویت
     if not await is_user_member(context, user.id):
+        # 🎯 پنجره هشدار — کاربر باید اول عضو بشه
         await query.answer(
-            "❌ هنوز عضو کانال نشدی! اول عضو شو، بعد دوباره امتحان کن.",
+            "😤 کوندبازی در نیار یارو!\n\n"
+            "اول برو توی کانال عضو شو، بعد دوباره روی «✅ عضو شدم» بزن.",
             show_alert=True,
         )
         return
 
-    # عضو شده → ساخت کاربر و ویرایش پیام به منوی اصلی
+    # عضو شده → بستن پنجره لودینگ
+    await query.answer("✅ عضویتت تایید شد!")
+
+    # ساخت کاربر و ویرایش پیام به منوی اصلی
     try:
         await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
