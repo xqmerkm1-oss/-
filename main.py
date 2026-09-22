@@ -3,6 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
     filters,
@@ -10,7 +11,11 @@ from telegram.ext import (
 
 from config import BOT_TOKEN
 from database import init_db
-from handlers import start_handler, text_handler
+from handlers import (
+    check_membership_callback,
+    start_handler,
+    text_handler,
+)
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -32,10 +37,15 @@ def build_application() -> Application:
         .build()
     )
 
-    # فقط /start با اسلش می‌مونه (چون تلگرام اجبار داره)
+    # دکمه‌ی «عضو شدم»
+    app.add_handler(
+        CallbackQueryHandler(check_membership_callback, pattern="^check_membership$")
+    )
+
+    # /start
     app.add_handler(CommandHandler("start", start_handler))
 
-    # همه‌ی پیام‌های متنی (راهنما، پروفایل، برترها، کلمات کلیدی)
+    # همه‌ی پیام‌های متنی
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
     )
