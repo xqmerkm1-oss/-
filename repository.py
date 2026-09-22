@@ -33,7 +33,6 @@ async def get_or_create_user(
 
 
 async def give_reward(telegram_id: int, points: int) -> User | None:
-    """پد رو آپدیت می‌کنه و زمان آخرین جایزه رو ذخیره می‌کنه."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -50,7 +49,6 @@ async def give_reward(telegram_id: int, points: int) -> User | None:
 
 
 async def mark_bread_used(telegram_id: int) -> None:
-    """پرچم نون بربری رو True می‌کنه."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -62,7 +60,6 @@ async def mark_bread_used(telegram_id: int) -> None:
 
 
 def seconds_remaining(user: User) -> int:
-    """چند ثانیه تا پایان کول‌داون مونده."""
     if user.last_reward_at is None:
         return 0
 
@@ -77,7 +74,6 @@ def seconds_remaining(user: User) -> int:
 
 
 async def get_top_users(limit: int = 10) -> list[User]:
-    """۱۰ نفر برتر بر اساس پد."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).order_by(desc(User.pads)).limit(limit)
