@@ -1,7 +1,7 @@
 import logging
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ParseMode, ChatMemberStatus
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from keyboards import help_keyboard, start_keyboard
@@ -43,11 +43,8 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
     """چک می‌کنه کاربر واقعاً عضو کانال هست یا نه."""
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        if member.status in (
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.CREATOR,
-        ):
+        status = member.status
+        if status in ("member", "administrator", "creator"):
             return True
         return False
     except Exception as exc:
