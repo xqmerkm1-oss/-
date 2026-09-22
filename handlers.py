@@ -24,13 +24,13 @@ CHANNEL_LINK = "https://t.me/SchompedCanal"
 # 🎁 کلمات کلیدی: {کلمه: (پد, حداقل پد)}
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
-    "شمع": (5, 0),
-    "سیفید": (5, 0),
-    "شومپد": (7, 0),
     "دختر خوب": (5, 500),
     "پسر خوب": (5, 500),
     "نون بربری": (5, 1000),
     "آجر": (5, 3000),
+    "شمع": (5, 6000),
+    "سیفید": (5, 10000),
+    "شومپد": (10, 20000),
 }
 
 CMD_HELP = "راهنما"
@@ -172,8 +172,14 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         username = f"@{db_user.username}" if db_user.username else "ندارد"
         name = db_user.first_name or "دوست عزیز"
 
-        if db_user.pads >= 3000:
+        if db_user.pads >= 20000:
             unlock_status = "✅ همه کلمات باز شده!"
+        elif db_user.pads >= 10000:
+            unlock_status = "✅ <b>سیفید</b> باز شده!"
+        elif db_user.pads >= 6000:
+            unlock_status = "✅ <b>شمع</b> باز شده!"
+        elif db_user.pads >= 3000:
+            unlock_status = "✅ <b>آجر</b> باز شده!"
         elif db_user.pads >= 1000:
             unlock_status = "✅ <b>نون بربری</b> باز شده!"
         elif db_user.pads >= 500:
@@ -287,8 +293,14 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     name = db_user.first_name or "دوست عزیز"
     username = f"@{db_user.username}" if db_user.username else "ندارد"
 
-    if db_user.pads >= 3000:
+    if db_user.pads >= 20000:
         unlock_status = "✅ همه کلمات باز شده!"
+    elif db_user.pads >= 10000:
+        unlock_status = "✅ <b>سیفید</b> باز شده!"
+    elif db_user.pads >= 6000:
+        unlock_status = "✅ <b>شمع</b> باز شده!"
+    elif db_user.pads >= 3000:
+        unlock_status = "✅ <b>آجر</b> باز شده!"
     elif db_user.pads >= 1000:
         unlock_status = "✅ <b>نون بربری</b> باز شده!"
     elif db_user.pads >= 500:
@@ -372,7 +384,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logger.exception("DB error: %s", exc)
         return
 
-    # قفل مخصوص: اگه نون بربری زده، دختر خوب و پسر خوب رو نتونه
     if text in ("دختر خوب", "پسر خوب") and db_user.bread_used:
         await update.message.reply_text(
             "🔒 چون <b>نون بربری</b> زدی، دیگه نمی‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> بزنی!",
@@ -434,6 +445,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>نون بربری</b> هم بزنی!"
     elif updated.pads >= 3000 and db_user.pads < 3000:
         unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>آجر</b> هم بزنی!"
+    elif updated.pads >= 6000 and db_user.pads < 6000:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>شمع</b> هم بزنی!"
+    elif updated.pads >= 10000 and db_user.pads < 10000:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>سیفید</b> هم بزنی!"
+    elif updated.pads >= 20000 and db_user.pads < 20000:
+        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>شومپد</b> هم بزنی!"
 
     await update.message.reply_text(
         f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
