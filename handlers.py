@@ -52,7 +52,8 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         return False
     except Exception as exc:
         logger.exception("get_chat_member error: %s", exc)
-        return False
+        # اگه ربات ادمین نباشه یا خطا داد، کاربر رو رد کن تا گیر نکنه
+        return True
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
