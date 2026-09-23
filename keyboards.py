@@ -39,33 +39,23 @@ def start_keyboard() -> InlineKeyboardMarkup:
 
 
 def back_keyboard() -> InlineKeyboardMarkup:
-    keyboard = [
+    return InlineKeyboardMarkup([
         [_btn("🔙 بازگشت", callback_data="menu_back", style="danger")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
+    ])
 
 
 def help_keyboard() -> InlineKeyboardMarkup:
-    keyboard = [
+    return InlineKeyboardMarkup([
         [_btn("🔙 بستن", callback_data="menu_close", style="danger")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
+    ])
 
 
 def shop_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
-        [
-            _btn("🔪 خرید کارگر افغانی (۱۰۰ 🥖)", callback_data="shop_buy_worker", style="primary"),
-        ],
-        [
-            _btn("🛡️ خرید لر (۵۰ 🧱)", callback_data="shop_buy_lord", style="primary"),
-        ],
-        [
-            _btn("🍰 خرید کیک یزدی (۱۰ 🥖)", callback_data="shop_buy_cake", style="primary"),
-        ],
-        [
-            _btn("🔙 بازگشت", callback_data="menu_back", style="danger"),
-        ],
+        [_btn("🔪 خرید کارگر افغانی (۱۰۰ 🥖)", callback_data="shop_buy_worker", style="primary")],
+        [_btn("🛡️ خرید لر (۵۰ 🧱)", callback_data="shop_buy_lord", style="primary")],
+        [_btn("🍰 خرید کیک یزدی (۱۰ 🥖)", callback_data="shop_buy_cake", style="primary")],
+        [_btn("🔙 بازگشت", callback_data="menu_back", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
