@@ -756,7 +756,7 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 # انتقال پد توسط سازنده‌ها
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """دستور انتقال پد توسط سازنده‌ها.
+    """انتقال پد توسط سازنده‌ها.
 
     فرمت‌ها:
     - انتقال 1000 7803165903
@@ -793,15 +793,12 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     target_user = None
 
-    # حالت ۱: ریپلای
     if update.message.reply_to_message is not None:
         reply_user = update.message.reply_to_message.from_user
         if reply_user is not None:
             target_user, _ = await get_or_create_user(
                 reply_user.id, reply_user.username, reply_user.first_name
             )
-
-    # حالت ۲: آی‌دی یا یوزرنیم توی متن
     elif len(parts) >= 3:
         target_str = parts[2]
         if target_str.startswith("@"):
@@ -836,14 +833,144 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         await context.bot.send_message(
             chat_id=target_user.telegram_id,
             text=(
-                f"🎁 <b>یه هدیه!</b>\n\n"
-                f"💎 <b>{amount} پد</b> از طرف مدیریت بهت داده شد!\n"
+                f"🎁 <b>یه هدیه از طرف مدیریت!</b>\n\n"
+                f"💎 <b>{amount} پد</b> بهت داده شد.\n"
                 f"💰 پد جدید تو: <b>{new_total}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
     except Exception as exc:
         logger.exception("send_message to receiver error: %s", exc)
+
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=(
+                f"📤 <b>انتقال انجام شد</b>\n\n"
+                f"👤 گیرنده: <b>{target_name}</b>\n"
+                f"💎 مقدار: <b>{amount} پد</b>\n"
+                f"💰 پد جدید گیرنده: <b>{new_total}</b>"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("send_message to sender error: %s", exc)
+
+
+async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """حذف انتقال پد توسط سازنده‌ها.
+
+    پد از گیرنده کم می‌شه و به سازنده برمی‌گرده.
+
+    فرمت‌ها:
+    - حذف انتقال 1000 7803165903
+    - حذف انتقال 1000 @username
+    - حذف انتقال 1000 (با ریپلای روی پیام کاربر)
+    """
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    text = update.message.text.strip()
+
+    if user.id not in ADMIN_IDS:
+        return
+
+    parts = text.split()
+    # parts: ["حذف", "انتقال", "1000", "7803165903"]
+    if len(parts) < 3:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>حذف انتقال [تعداد] [آی‌دی/یوزرنیم]</code>\n"
+            "یا\n"
+            "<code>حذف انتقال [تعداد]</code> + ریپلای روی پیام کاربر",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    try:
+        amount = int(parts[2])
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
+        return
+
+    target_user = None
+
+    if update.message.reply_to_message is not None:
+        reply_user = update.message.reply_to_message.from_user
+        if reply_user is not None:
+            target_user = await get_user_by_id(reply_user.id)
+    elif len(parts) >= 4:
+        target_str = parts[3]
+        if target_str.startswith("@"):
+            target_user = await get_user_by_username(target_str)
+        else:
+            try:
+                target_id = int(target_str)
+                target_user = await get_user_by_id(target_id)
+            except ValueError:
+                pass
+
+    if target_user is None:
+        await update.message.reply_text(
+            "❌ کاربر پیدا نشد!\n"
+            "می‌تونی آی‌دی عددی یا یوزرنیم بدی، یا روی پیام کاربر ریپلای کنی.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if target_user.pads < amount:
+        await update.message.reply_text(
+            f"❌ این کاربر فقط <b>{target_user.pads} پد</b> داره! نمی‌شه <b>{amount} پد</b> ازش کم کرد.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    new_total = target_user.pads - amount
+    await set_user_pads(target_user.telegram_id, new_total)
+
+    sender, _ = await get_or_create_user(user.id, user.username, user.first_name)
+    sender_new_total = sender.pads + amount
+    await set_user_pads(user.id, sender_new_total)
+
+    target_name = target_user.first_name or target_user.username or "کاربر"
+
+    await update.message.reply_text(
+        f"✅ <b>{amount} پد</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
+        f"💎 پد جدید گیرنده: <b>{new_total}</b>\n"
+        f"💰 پد جدید تو: <b>{sender_new_total}</b>",
+        parse_mode=ParseMode.HTML,
+    )
+
+    try:
+        await context.bot.send_message(
+            chat_id=target_user.telegram_id,
+            text=(
+                f"⚠️ <b>اطلاعیه مدیریت</b>\n\n"
+                f"💎 <b>{amount} پد</b> ازت پس گرفته شد.\n"
+                f"💰 پد جدید تو: <b>{new_total}</b>"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("send_message to receiver error: %s", exc)
+
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=(
+                f"📥 <b>حذف انتقال انجام شد</b>\n\n"
+                f"👤 کاربر: <b>{target_name}</b>\n"
+                f"💎 مقدار: <b>{amount} پد</b>\n"
+                f"💰 پد جدید گیرنده: <b>{new_total}</b>\n"
+                f"💰 پد جدید تو: <b>{sender_new_total}</b>"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("send_message to sender error: %s", exc)
 
 
 # ─────────────────────────────────────────────
@@ -877,7 +1004,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # ─── دستور انتقال پد (فقط سازنده‌ها) ───
+    # ─── حذف انتقال (باید قبل از انتقال چک بشه) ───
+    if text.startswith("حذف انتقال"):
+        if user.id not in ADMIN_IDS:
+            return
+        await admin_remove_transfer_handler(update, context)
+        return
+
+    # ─── انتقال پد (فقط سازنده‌ها) ───
     if text.startswith("انتقال"):
         if user.id not in ADMIN_IDS:
             return
