@@ -46,11 +46,11 @@ def build_application() -> Application:
         )
     )
 
-    # همه دکمه‌های دیگه (menu_, shop_, attack_)
+    # همه دکمه‌های دیگه (menu_, shop_, attack_, help_)
     app.add_handler(
         CallbackQueryHandler(
             menu_callback,
-            pattern=r"^(menu_|shop_|attack_)",
+            pattern=r"^(menu_|shop_|attack_|help_)",
         )
     )
 
