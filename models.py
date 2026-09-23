@@ -16,21 +16,27 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # 🎯 BigInteger برای پشتیبانی از اعداد بزرگ
+    # پد اصلی
     pads: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     bread_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # منابع
-    meat: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
-    tea: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
-    bricks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    bread_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    cake: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    shields: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # منبع‌ها
+    meat: Mapped[int] = mapped_column(BigInteger, default=200, nullable=False)
+    tea: Mapped[int] = mapped_column(BigInteger, default=100, nullable=False)
+    bricks: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    bread_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    cake: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    shields: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+
+    # منبع‌های تکی (هر کلمه کلیدی جدا)
+    pad_rose: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    pad_girl: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    pad_boy: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    pad_candle: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
     # جنگجوها
-    workers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    lords: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    workers: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    lords: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
     # دعوت
     invited_by: Mapped[int | None] = mapped_column(
