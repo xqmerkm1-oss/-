@@ -13,6 +13,7 @@ from keyboards import (
 )
 from messages import HELP_TEXT, START_TEXT
 from repository import (
+    RESOURCE_MAP,
     add_pads,
     get_or_create_user,
     get_random_user_in_group,
@@ -24,6 +25,7 @@ from repository import (
     mark_bread_used,
     seconds_remaining,
     set_user_pads,
+    transfer_resource,
     transfer_shields,
     update_resources,
 )
@@ -51,6 +53,18 @@ KEYWORDS: dict[str, tuple[int, int]] = {
     "شمع": (5, 6000),
     "سیفید": (5, 10000),
     "شومپد": (10, 20000),
+}
+
+# 🎯 نقشه کلمه کلیدی به ستون منبع خاص
+KEYWORD_RESOURCE = {
+    "گل رز": "pad_rose",
+    "دختر خوب": "pad_girl",
+    "پسر خوب": "pad_boy",
+    "شمع": "pad_candle",
+    "آجر": "bricks",
+    "نون بربری": "bread_count",
+    "سیفید": "shields",
+    "شومپد": None,
 }
 
 CMD_HELP = "راهنما"
@@ -322,9 +336,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(
             f"🛒 <b>فروشگاه شومپد</b>\n\n"
             f"💰 موجودی تو:\n"
-            f"🥖 نون بربری: <b>{db_user.bread_count}</b>\n"
-            f"🧱 آجر: <b>{db_user.bricks}</b>\n"
-            f"🍰 کیک یزدی: <b>{db_user.cake}</b>\n\n"
+            f"🥖 نون بربری: <b>{db_user.bread_count:,}</b>\n"
+            f"🧱 آجر: <b>{db_user.bricks:,}</b>\n"
+            f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n\n"
             f"🔪 کارگر افغانی — ۱۰۰ نون بربری\n"
             f"🛡️ لر — ۵۰ آجر\n"
             f"🍰 کیک یزدی — ۱۰ نون بربری",
@@ -346,8 +360,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer(
                 f"❌ موجودی کافی نداری!\n\n"
                 f"🥖 نیاز: ۱۰۰ نون بربری\n"
-                f"💰 موجودی تو: {db_user.bread_count}\n\n"
-                f"📉 {100 - db_user.bread_count} نون بربری دیگه لازم داری.",
+                f"💰 موجودی تو: {db_user.bread_count:,}\n\n"
+                f"📉 {100 - db_user.bread_count:,} نون بربری دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -373,8 +387,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer(
                 f"❌ موجودی کافی نداری!\n\n"
                 f"🧱 نیاز: ۵۰ آجر\n"
-                f"💰 موجودی تو: {db_user.bricks}\n\n"
-                f"📉 {50 - db_user.bricks} آجر دیگه لازم داری.",
+                f"💰 موجودی تو: {db_user.bricks:,}\n\n"
+                f"📉 {50 - db_user.bricks:,} آجر دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -400,8 +414,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer(
                 f"❌ موجودی کافی نداری!\n\n"
                 f"🥖 نیاز: ۱۰ نون بربری\n"
-                f"💰 موجودی تو: {db_user.bread_count}\n\n"
-                f"📉 {10 - db_user.bread_count} نون بربری دیگه لازم داری.",
+                f"💰 موجودی تو: {db_user.bread_count:,}\n\n"
+                f"📉 {10 - db_user.bread_count:,} نون بربری دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -579,15 +593,19 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     await update.message.reply_text(
         f"🎒 <b>منابع تو</b>\n\n"
-        f"🥩 گوشت: <b>{db_user.meat}</b>\n"
-        f"🍵 چای: <b>{db_user.tea}</b>\n"
-        f"🧱 آجر: <b>{db_user.bricks}</b>\n"
-        f"🥖 نون بربری: <b>{db_user.bread_count}</b>\n"
-        f"🍰 کیک یزدی: <b>{db_user.cake}</b>\n"
-        f"🔪 سیفید: <b>{db_user.shields}</b>\n\n"
+        f"🥩 گوشت: <b>{db_user.meat:,}</b>\n"
+        f"🍵 چای: <b>{db_user.tea:,}</b>\n"
+        f"🧱 آجر: <b>{db_user.bricks:,}</b>\n"
+        f"🥖 نون بربری: <b>{db_user.bread_count:,}</b>\n"
+        f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n"
+        f"🔪 سیفید: <b>{db_user.shields:,}</b>\n\n"
+        f"🌹 گل رز: <b>{db_user.pad_rose:,}</b>\n"
+        f"🌸 دختر خوب: <b>{db_user.pad_girl:,}</b>\n"
+        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n"
+        f"🕯️ شمع: <b>{db_user.pad_candle:,}</b>\n\n"
         f"⚔️ <b>جنگجوها:</b>\n"
-        f"🔪 کارگر افغانی: <b>{db_user.workers}</b>\n"
-        f"🛡️ لر: <b>{db_user.lords}</b>",
+        f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
+        f"🛡️ لر: <b>{db_user.lords:,}</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -626,8 +644,8 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(
         f"⚔️ <b>آماده‌ی حمله به {target_name} هستی!</b>\n\n"
-        f"🔪 کارگرهای افغانی تو: <b>{db_user.workers}</b>\n"
-        f"🛡️ لرهای حریف: <b>{target.lords}</b>\n\n"
+        f"🔪 کارگرهای افغانی تو: <b>{db_user.workers:,}</b>\n"
+        f"🛡️ لرهای حریف: <b>{target.lords:,}</b>\n\n"
         f"تایید می‌کنی؟",
         parse_mode=ParseMode.HTML,
         reply_markup=attack_keyboard(target.telegram_id),
@@ -657,8 +675,8 @@ async def execute_attack(update, context, user, target_id: int) -> None:
         await update_resources(user.id, workers=0)
         await query.edit_message_text(
             f"💥 <b>حمله شکست خورد!</b>\n\n"
-            f"🛡️ لرهای حریف <b>{bricks_thrown}</b> آجر پرت کردن!\n"
-            f"🔪 تمام <b>{workers}</b> کارگر افغانی تو کشته شدن. 🪦",
+            f"🛡️ لرهای حریف <b>{bricks_thrown:,}</b> آجر پرت کردن!\n"
+            f"🔪 تمام <b>{workers:,}</b> کارگر افغانی تو کشته شدن. 🪦",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
@@ -681,9 +699,9 @@ async def execute_attack(update, context, user, target_id: int) -> None:
 
     await query.edit_message_text(
         f"🎉 <b>حمله موفق!</b>\n\n"
-        f"🥩 <b>{stolen_meat}</b> گوشت دزدیدی!\n"
-        f"🍵 <b>{stolen_tea}</b> چای دزدیدی!\n\n"
-        f"🔪 <b>{workers}</b> کارگر افغانی تو قربانی شدن.",
+        f"🥩 <b>{stolen_meat:,}</b> گوشت دزدیدی!\n"
+        f"🍵 <b>{stolen_tea:,}</b> چای دزدیدی!\n\n"
+        f"🔪 <b>{workers:,}</b> کارگر افغانی تو قربانی شدن.",
         parse_mode=ParseMode.HTML,
         reply_markup=back_keyboard(),
     )
@@ -719,7 +737,7 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
     if sender.shields < amount:
         await update.message.reply_text(
-            f"❌ سیفید کافی نداری!\nموجودی: <b>{sender.shields}</b>",
+            f"❌ سیفید کافی نداری!\nموجودی: <b>{sender.shields:,}</b>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -747,21 +765,22 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
     if success:
         target_name = target_user.first_name or target_user.username or "کاربر"
         await update.message.reply_text(
-            f"🎁 <b>{amount} سیفید</b> به <b>{target_name}</b> پرت کردی!",
+            f"🎁 <b>{amount:,} سیفید</b> به <b>{target_name}</b> پرت کردی!",
             parse_mode=ParseMode.HTML,
         )
 
 
 # ─────────────────────────────────────────────
-# انتقال پد توسط سازنده‌ها (نامحدود)
+# انتقال منابع توسط سازنده‌ها (نامحدود)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال پد توسط سازنده‌ها — نامحدود.
+    """انتقال هر منبعی توسط سازنده‌ها — نامحدود.
 
     فرمت‌ها:
-    - انتقال 1000 7803165903
-    - انتقال 1000 @username
-    - انتقال 1000 (با ریپلای)
+    - انتقال پد 1000 7803165903
+    - انتقال گوشت 500 @ali
+    - انتقال گل رز 100 1844792522
+    - انتقال پد 1000 (با ریپلای)
     """
     if update.message is None or update.effective_user is None:
         return
@@ -773,117 +792,26 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     parts = text.split()
-    if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ فرمت درست:\n"
-            "<code>انتقال [تعداد] [آی‌دی/یوزرنیم]</code>\n"
-            "یا\n"
-            "<code>انتقال [تعداد]</code> + ریپلای روی پیام کاربر",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
-    try:
-        amount = int(parts[1])
-        if amount <= 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
-        return
-
-    target_user = None
-
-    if update.message.reply_to_message is not None:
-        reply_user = update.message.reply_to_message.from_user
-        if reply_user is not None:
-            target_user, _ = await get_or_create_user(
-                reply_user.id, reply_user.username, reply_user.first_name
-            )
-    elif len(parts) >= 3:
-        target_str = parts[2]
-        if target_str.startswith("@"):
-            target_user = await get_user_by_username(target_str)
-        else:
-            try:
-                target_id = int(target_str)
-                target_user = await get_user_by_id(target_id)
-            except ValueError:
-                pass
-
-    if target_user is None:
-        await update.message.reply_text(
-            "❌ کاربر پیدا نشد!\n"
-            "می‌تونی آی‌دی عددی یا یوزرنیم بدی، یا روی پیام کاربر ریپلای کنی.",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
-    new_total = target_user.pads + amount
-    await set_user_pads(target_user.telegram_id, new_total)
-
-    target_name = target_user.first_name or target_user.username or "کاربر"
-
-    await update.message.reply_text(
-        f"✅ <b>{amount:,} پد</b> به <b>{target_name}</b> منتقل شد!\n\n"
-        f"💎 پد جدید گیرنده: <b>{new_total:,}</b>",
-        parse_mode=ParseMode.HTML,
-    )
-
-    try:
-        await context.bot.send_message(
-            chat_id=target_user.telegram_id,
-            text=(
-                f"🎁 <b>یه هدیه از طرف مدیریت!</b>\n\n"
-                f"💎 <b>{amount:,} پد</b> بهت داده شد.\n"
-                f"💰 پد جدید تو: <b>{new_total:,}</b>"
-            ),
-            parse_mode=ParseMode.HTML,
-        )
-    except Exception as exc:
-        logger.exception("send_message to receiver error: %s", exc)
-
-    try:
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=(
-                f"📤 <b>انتقال انجام شد</b>\n\n"
-                f"👤 گیرنده: <b>{target_name}</b>\n"
-                f"💎 مقدار: <b>{amount:,} پد</b>\n"
-                f"💰 پد جدید گیرنده: <b>{new_total:,}</b>"
-            ),
-            parse_mode=ParseMode.HTML,
-        )
-    except Exception as exc:
-        logger.exception("send_message to sender error: %s", exc)
-
-
-async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال پد توسط سازنده‌ها — نامحدود.
-
-    پد از گیرنده کم می‌شه (حتی اگه منفی بشه) و به سازنده برمی‌گرده.
-
-    فرمت‌ها:
-    - حذف انتقال 1000 7803165903
-    - حذف انتقال 1000 @username
-    - حذف انتقال 1000 (با ریپلای)
-    """
-    if update.message is None or update.effective_user is None:
-        return
-
-    user = update.effective_user
-    text = update.message.text.strip()
-
-    if user.id not in ADMIN_IDS:
-        return
-
-    parts = text.split()
-    # parts: ["حذف", "انتقال", "1000", "7803165903"]
     if len(parts) < 3:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
-            "<code>حذف انتقال [تعداد] [آی‌دی/یوزرنیم]</code>\n"
+            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
             "یا\n"
-            "<code>حذف انتقال [تعداد]</code> + ریپلای روی پیام کاربر",
+            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
+            "📋 منابع قابل انتقال:\n"
+            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
+            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    resource_name = parts[1]
+    if resource_name not in RESOURCE_MAP:
+        await update.message.reply_text(
+            f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
+            f"📋 منابع معتبر:\n"
+            f"<code>پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
+            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -901,7 +829,9 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     if update.message.reply_to_message is not None:
         reply_user = update.message.reply_to_message.from_user
         if reply_user is not None:
-            target_user = await get_user_by_id(reply_user.id)
+            target_user, _ = await get_or_create_user(
+                reply_user.id, reply_user.username, reply_user.first_name
+            )
     elif len(parts) >= 4:
         target_str = parts[3]
         if target_str.startswith("@"):
@@ -921,20 +851,20 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    # 🎯 بدون چک موجودی — حتی اگه منفی بشه
-    new_total = target_user.pads - amount
-    await set_user_pads(target_user.telegram_id, new_total)
+    success, sender_new, receiver_new = await transfer_resource(
+        user.id, target_user.telegram_id, resource_name, amount
+    )
 
-    sender, _ = await get_or_create_user(user.id, user.username, user.first_name)
-    sender_new_total = sender.pads + amount
-    await set_user_pads(user.id, sender_new_total)
+    if not success:
+        await update.message.reply_text("❌ خطا در انتقال!")
+        return
 
     target_name = target_user.first_name or target_user.username or "کاربر"
 
     await update.message.reply_text(
-        f"✅ <b>{amount:,} پد</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
-        f"💎 پد جدید گیرنده: <b>{new_total:,}</b>\n"
-        f"💰 پد جدید تو: <b>{sender_new_total:,}</b>",
+        f"✅ <b>{amount:,} {resource_name}</b> به <b>{target_name}</b> منتقل شد!\n\n"
+        f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
+        f"📦 موجودی جدید تو: <b>{sender_new:,}</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -942,9 +872,9 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         await context.bot.send_message(
             chat_id=target_user.telegram_id,
             text=(
-                f"⚠️ <b>اطلاعیه مدیریت</b>\n\n"
-                f"💎 <b>{amount:,} پد</b> ازت پس گرفته شد.\n"
-                f"💰 پد جدید تو: <b>{new_total:,}</b>"
+                f"🎁 <b>یه هدیه از طرف مدیریت!</b>\n\n"
+                f"📦 <b>{amount:,} {resource_name}</b> بهت داده شد.\n"
+                f"💰 موجودی جدید تو: <b>{receiver_new:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -955,16 +885,117 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         await context.bot.send_message(
             chat_id=user.id,
             text=(
-                f"📥 <b>حذف انتقال انجام شد</b>\n\n"
-                f"👤 کاربر: <b>{target_name}</b>\n"
-                f"💎 مقدار: <b>{amount:,} پد</b>\n"
-                f"💰 پد جدید گیرنده: <b>{new_total:,}</b>\n"
-                f"💰 پد جدید تو: <b>{sender_new_total:,}</b>"
+                f"📤 <b>انتقال انجام شد</b>\n\n"
+                f"📦 منبع: <b>{resource_name}</b>\n"
+                f"👤 گیرنده: <b>{target_name}</b>\n"
+                f"💎 مقدار: <b>{amount:,}</b>\n"
+                f"💰 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
+                f"💰 موجودی جدید تو: <b>{sender_new:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
     except Exception as exc:
         logger.exception("send_message to sender error: %s", exc)
+
+
+async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """حذف انتقال هر منبعی توسط سازنده‌ها — نامحدود.
+
+    فرمت‌ها:
+    - حذف انتقال پد 1000 7803165903
+    - حذف انتقال گوشت 500 @ali
+    - حذف انتقال گل رز 100 1844792522
+    """
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    text = update.message.text.strip()
+
+    if user.id not in ADMIN_IDS:
+        return
+
+    parts = text.split()
+    if len(parts) < 4:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
+            "یا\n"
+            "<code>حذف انتقال [منبع] [تعداد]</code> + ریپلای",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    resource_name = parts[2]
+    if resource_name not in RESOURCE_MAP:
+        await update.message.reply_text(
+            f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    try:
+        amount = int(parts[3])
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
+        return
+
+    target_user = None
+
+    if update.message.reply_to_message is not None:
+        reply_user = update.message.reply_to_message.from_user
+        if reply_user is not None:
+            target_user = await get_user_by_id(reply_user.id)
+    elif len(parts) >= 5:
+        target_str = parts[4]
+        if target_str.startswith("@"):
+            target_user = await get_user_by_username(target_str)
+        else:
+            try:
+                target_id = int(target_str)
+                target_user = await get_user_by_id(target_id)
+            except ValueError:
+                pass
+
+    if target_user is None:
+        await update.message.reply_text(
+            "❌ کاربر پیدا نشد!",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # انتقال معکوس: از گیرنده به سازنده
+    success, target_new, sender_new = await transfer_resource(
+        target_user.telegram_id, user.id, resource_name, amount
+    )
+
+    if not success:
+        await update.message.reply_text("❌ خطا در حذف انتقال!")
+        return
+
+    target_name = target_user.first_name or target_user.username or "کاربر"
+
+    await update.message.reply_text(
+        f"✅ <b>{amount:,} {resource_name}</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
+        f"📦 موجودی جدید گیرنده: <b>{target_new:,}</b>\n"
+        f"📦 موجودی جدید تو: <b>{sender_new:,}</b>",
+        parse_mode=ParseMode.HTML,
+    )
+
+    try:
+        await context.bot.send_message(
+            chat_id=target_user.telegram_id,
+            text=(
+                f"⚠️ <b>اطلاعیه مدیریت</b>\n\n"
+                f"📦 <b>{amount:,} {resource_name}</b> ازت پس گرفته شد.\n"
+                f"💰 موجودی جدید تو: <b>{target_new:,}</b>"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("send_message to receiver error: %s", exc)
 
 
 # ─────────────────────────────────────────────
@@ -998,14 +1029,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # ─── حذف انتقال (باید قبل از انتقال چک بشه) ───
+    # حذف انتقال (قبل از انتقال چک بشه)
     if text.startswith("حذف انتقال"):
         if user.id not in ADMIN_IDS:
             return
         await admin_remove_transfer_handler(update, context)
         return
 
-    # ─── انتقال پد (فقط سازنده‌ها) ───
+    # انتقال (فقط سازنده‌ها)
     if text.startswith("انتقال"):
         if user.id not in ADMIN_IDS:
             return
@@ -1063,21 +1094,44 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    if text == "نون بربری":
-        await update_resources(user.id, bread_count=updated.bread_count + 5)
-    elif text == "آجر":
-        await update_resources(user.id, bricks=updated.bricks + 5)
-    elif text == "سیفید":
-        await update_resources(user.id, shields=updated.shields + 5)
+    # 🎯 افزایش منبع خاص
+    resource_column = KEYWORD_RESOURCE.get(text)
+    if resource_column is not None:
+        current_val = getattr(updated, resource_column)
+        await update_resources(user.id, **{resource_column: current_val + points})
 
     bread_msg = ""
     if text == "نون بربری":
         await mark_bread_used(user.id)
         bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
+    # خوندن دوباره کاربر برای نمایش آخرین مقادیر
+    fresh_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+
+    # ساخت متن نمایش منابع
+    resource_lines = []
+    if text == "گل رز":
+        resource_lines.append(f"🌹 گل رز های تو: <b>{fresh_user.pad_rose:,}</b>")
+    elif text == "دختر خوب":
+        resource_lines.append(f"🌸 دختر خوب های تو: <b>{fresh_user.pad_girl:,}</b>")
+    elif text == "پسر خوب":
+        resource_lines.append(f"🌟 پسر خوب های تو: <b>{fresh_user.pad_boy:,}</b>")
+    elif text == "شمع":
+        resource_lines.append(f"🕯️ شمع های تو: <b>{fresh_user.pad_candle:,}</b>")
+    elif text == "آجر":
+        resource_lines.append(f"🧱 آجر های تو: <b>{fresh_user.bricks:,}</b>")
+    elif text == "نون بربری":
+        resource_lines.append(f"🥖 نون بربری های تو: <b>{fresh_user.bread_count:,}</b>")
+    elif text == "سیفید":
+        resource_lines.append(f"🔪 سیفید های تو: <b>{fresh_user.shields:,}</b>")
+
+    resource_text = "\n".join(resource_lines)
+    resource_text = f"\n{resource_text}\n" if resource_text else ""
+
     await update.message.reply_text(
-        f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
-        f"💎 پد هات : <b>{updated.pads:,}</b>\n\n"
+        f"🎉 <b>{points} {text} پد گرفتی</b>\n"
+        f"{resource_text}"
+        f"💎 پد هات : <b>{fresh_user.pads:,}</b>\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{bread_msg}",
         parse_mode=ParseMode.HTML,
     )
