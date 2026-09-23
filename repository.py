@@ -112,7 +112,6 @@ async def update_resources(
     workers: int | None = None,
     lords: int | None = None,
 ) -> User | None:
-    """منابع کاربر رو آپدیت می‌کنه."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -144,20 +143,13 @@ async def update_resources(
 
 
 async def transfer_shields(from_id: int, to_id: int, amount: int) -> bool:
-    """سیفید از یه کاربر به کاربر دیگه منتقل می‌کنه."""
     async with AsyncSessionLocal() as session:
-        # فرستنده
-        r1 = await session.execute(
-            select(User).where(User.telegram_id == from_id)
-        )
+        r1 = await session.execute(select(User).where(User.telegram_id == from_id))
         sender = r1.scalar_one_or_none()
         if sender is None or sender.shields < amount:
             return False
 
-        # گیرنده
-        r2 = await session.execute(
-            select(User).where(User.telegram_id == to_id)
-        )
+        r2 = await session.execute(select(User).where(User.telegram_id == to_id))
         receiver = r2.scalar_one_or_none()
         if receiver is None:
             return False
@@ -193,12 +185,10 @@ async def get_top_users(limit: int = 10) -> list[User]:
 async def get_random_user_in_group(
     context, chat_id: int, exclude_id: int
 ) -> User | None:
-    """یه کاربر رندم از گروه انتخاب می‌کنه که توی دیتابیس هست."""
-    # این تابع نیاز به لیست اعضای گروه داره که تلگرام نمی‌ده
-    # پس فعلاً از ۱۰ کاربر برتر انتخاب می‌کنیم
+    import random
+
     top = await get_top_users(20)
     candidates = [u for u in top if u.telegram_id != exclude_id]
     if not candidates:
         return None
-    import random
     return random.choice(candidates)
