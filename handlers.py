@@ -1,19 +1,32 @@
 import logging
+import random
+import re
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from keyboards import back_keyboard, help_keyboard, start_keyboard
+from keyboards import (
+    attack_keyboard,
+    back_keyboard,
+    help_keyboard,
+    shop_keyboard,
+    start_keyboard,
+)
 from messages import HELP_TEXT, START_TEXT
 from repository import (
     add_pads,
     get_or_create_user,
+    get_random_user_in_group,
     get_top_users,
+    get_user_by_id,
+    get_user_by_username,
     give_reward,
     increment_invite_count,
     mark_bread_used,
     seconds_remaining,
+    transfer_shields,
+    update_resources,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,9 +36,8 @@ CHANNEL_ID = -1004372622419
 CHANNEL_LINK = "https://t.me/SchompedCanal"
 BOT_USERNAME = "Schompedbot"
 
-# 🎁 جایزه‌های دعوت
-INVITER_REWARD = 500  # به کسی که لینک داده
-INVITED_REWARD = 250  # به کسی که اومده
+INVITER_REWARD = 500
+INVITED_REWARD = 250
 
 
 KEYWORDS: dict[str, tuple[int, int]] = {
@@ -42,6 +54,8 @@ KEYWORDS: dict[str, tuple[int, int]] = {
 CMD_HELP = "راهنما"
 CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
+CMD_RESOURCES = "منابع"
+CMD_ATTACK = "حمله"
 
 
 async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
@@ -81,14 +95,13 @@ def invite_keyboard(invite_link: str) -> InlineKeyboardMarkup:
 
 
 # ─────────────────────────────────────────────
-# /start (با پشتیبانی از لینک دعوت)
+# /start
 # ─────────────────────────────────────────────
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
         return
 
-    # 🆕 چک لینک دعوت: /start invite_123456789
     inviter_id: int | None = None
     if context.args and len(context.args) > 0:
         arg = context.args[0]
@@ -98,21 +111,17 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             except ValueError:
                 inviter_id = None
 
-    # چک عضویت
     if not await is_user_member(context, user.id):
-        # کاربر رو با invited_by ذخیره می‌کنیم که بعد از عضویت پردازش بشه
         await update.message.reply_text(
             "🔒 <b>برای استفاده از ربات شومپد، اول باید توی کانال ما عضو بشی!</b>\n\n"
             "📢 روی دکمه زیر بزن و عضو شو، بعد روی «✅ عضو شدم» بزن:",
             parse_mode=ParseMode.HTML,
             reply_markup=join_keyboard(),
         )
-        # ذخیره‌ی inviter_id توی context.user_data
         if inviter_id is not None:
             context.user_data["pending_inviter"] = inviter_id
         return
 
-    # کاربر عضو هست — کاربر رو بساز یا بگیر
     try:
         db_user, is_new = await get_or_create_user(
             user.id, user.username, user.first_name, invited_by=inviter_id
@@ -121,11 +130,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.exception("DB error: %s", exc)
         db_user, is_new = None, False
 
-    # 🎁 پردازش دعوت (اگه کاربر جدید باشه و با لینک دعوت اومده باشه)
     if is_new and inviter_id is not None and inviter_id != user.id:
         await process_invite(update, context, inviter_id, user)
 
-    # اگه کاربر توی context.user_data یه inviter داره (از مرحله عضویت)
     pending = context.user_data.pop("pending_inviter", None)
     if pending and is_new and pending != user.id:
         await process_invite(update, context, pending, user)
@@ -139,20 +146,14 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def process_invite(update, context, inviter_id: int, new_user) -> None:
-    """جایزه دعوت رو به دعوت‌کننده و دعوت‌شده می‌ده."""
-    # چک کن دعوت‌کننده خودش نباشه
     if inviter_id == new_user.id:
         return
 
     try:
-        # به دعوت‌کننده ۵۰۰ پد
         await add_pads(inviter_id, INVITER_REWARD)
         await increment_invite_count(inviter_id)
-
-        # به دعوت‌شده ۲۵۰ پد
         await add_pads(new_user.id, INVITED_REWARD)
 
-        # پیام تبریک به دعوت‌شده
         if update.message:
             await update.message.reply_text(
                 f"🎉 <b>تبریک!</b>\n\n"
@@ -160,7 +161,6 @@ async def process_invite(update, context, inviter_id: int, new_user) -> None:
                 parse_mode=ParseMode.HTML,
             )
 
-        # پیام به دعوت‌کننده
         try:
             await context.bot.send_message(
                 chat_id=inviter_id,
@@ -203,7 +203,6 @@ async def check_membership_callback(
 
     await query.answer("✅ عضویتت تایید شد!")
 
-    # 🆕 کاربر جدید با لینک دعوت
     inviter_id = context.user_data.pop("pending_inviter", None)
 
     try:
@@ -213,7 +212,6 @@ async def check_membership_callback(
     except Exception as exc:
         logger.exception("DB error: %s", exc)
 
-    # 🎁 پردازش دعوت
     if inviter_id is not None and is_new and inviter_id != user.id:
         await process_invite(update, context, inviter_id, user)
 
@@ -256,6 +254,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
+    # ─── حساب من ───
     if data == "menu_profile":
         try:
             db_user, _ = await get_or_create_user(
@@ -270,12 +269,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if remaining > 0:
             minutes = remaining // 60
             secs = remaining % 60
-            if minutes > 0 and secs > 0:
-                cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه"
-            elif minutes > 0:
-                cooldown = f"⏳ {minutes} دقیقه"
-            else:
-                cooldown = f"⏳ {secs} ثانیه"
+            cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"⏳ {secs} ثانیه"
         else:
             cooldown = "✅ آماده"
 
@@ -316,29 +310,120 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
+    # ─── فروشگاه ───
     if data == "menu_shop":
-        await query.edit_message_text(
-            "🛒 <b>فروشگاه شومپد</b>\n\n"
-            "🚧 این بخش در حال ساخته شدنه!\n\n"
-            "به‌زودی می‌تونی با پدهات آیتم بخری و قوی‌تر بشی. 💪",
-            parse_mode=ParseMode.HTML,
-            reply_markup=back_keyboard(),
-        )
-        return
-
-    if data == "menu_top":
         try:
-            top_users = await get_top_users(10)
+            db_user, _ = await get_or_create_user(
+                user.id, user.username, user.first_name
+            )
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
             return
 
-        if not top_users:
-            await query.edit_message_text(
-                "🏆 هنوز کسی پدی نگرفته! 🥲",
-                reply_markup=back_keyboard(),
+        await query.edit_message_text(
+            f"🛒 <b>فروشگاه شومپد</b>\n\n"
+            f"💰 موجودی تو:\n"
+            f"🥖 نون بربری: <b>{db_user.bread_count}</b>\n"
+            f"🧱 آجر: <b>{db_user.bricks}</b>\n"
+            f"🍰 کیک یزدی: <b>{db_user.cake}</b>\n\n"
+            f"🔪 کارگر افغانی — ۱۰۰ نون بربری\n"
+            f"🛡️ لر — ۵۰ آجر\n"
+            f"🍰 کیک یزدی — ۱۰ نون بربری",
+            parse_mode=ParseMode.HTML,
+            reply_markup=shop_keyboard(),
+        )
+        return
+
+    # ─── خرید کارگر افغانی ───
+    if data == "shop_buy_worker":
+        try:
+            db_user, _ = await get_or_create_user(
+                user.id, user.username, user.first_name
             )
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if db_user.bread_count < 100:
+            await query.answer(
+                f"❌ نون بربری کافی نداری!\nنیاز: ۱۰۰\nموجودی: {db_user.bread_count}",
+                show_alert=True,
+            )
+            return
+
+        await update_resources(
+            user.id,
+            bread_count=db_user.bread_count - 100,
+            workers=db_user.workers + 1,
+        )
+        await query.answer("✅ یه کارگر افغانی خریدی!", show_alert=True)
+        return
+
+    # ─── خرید لر ───
+    if data == "shop_buy_lord":
+        try:
+            db_user, _ = await get_or_create_user(
+                user.id, user.username, user.first_name
+            )
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if db_user.bricks < 50:
+            await query.answer(
+                f"❌ آجر کافی نداری!\nنیاز: ۵۰\nموجودی: {db_user.bricks}",
+                show_alert=True,
+            )
+            return
+
+        await update_resources(
+            user.id,
+            bricks=db_user.bricks - 50,
+            lords=db_user.lords + 1,
+        )
+        await query.answer("✅ یه لر خریدی!", show_alert=True)
+        return
+
+    # ─── خرید کیک یزدی ───
+    if data == "shop_buy_cake":
+        try:
+            db_user, _ = await get_or_create_user(
+                user.id, user.username, user.first_name
+            )
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if db_user.bread_count < 10:
+            await query.answer(
+                f"❌ نون بربری کافی نداری!\nنیاز: ۱۰\nموجودی: {db_user.bread_count}",
+                show_alert=True,
+            )
+            return
+
+        await update_resources(
+            user.id,
+            bread_count=db_user.bread_count - 10,
+            cake=db_user.cake + 1,
+        )
+        await query.answer("✅ یه کیک یزدی خریدی!", show_alert=True)
+        return
+
+    # ─── برترها ───
+    if data == "menu_top":
+        try:
+            top_users = await get_top_users(10)
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
+            return
+
+        if not top_users:
+            await query.edit_message_text("🏆 هنوز کسی پدی نگرفته!", reply_markup=back_keyboard())
             return
 
         medals = ["🥇", "🥈", "🥉"] + ["🎖️"] * 7
@@ -354,7 +439,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── 🎁 دعوت دوستان ───
+    # ─── دعوت دوستان ───
     if data == "menu_invite":
         try:
             db_user, _ = await get_or_create_user(
@@ -362,7 +447,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
         except Exception as exc:
             logger.exception("DB error: %s", exc)
-            await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
+            await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
             return
 
         invite_link = f"https://t.me/{BOT_USERNAME}?start=invite_{user.id}"
@@ -375,17 +460,34 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"• دوستت: <b>{INVITED_REWARD} پد</b> بعد از عضو شدن\n\n"
             f"👥 تعداد دعوت‌های موفق تو: <b>{db_user.invite_count}</b>\n\n"
             f"🔗 <b>لینک دعوت اختصاصی تو:</b>\n"
-            f"<code>{invite_link}</code>\n\n"
-            f"💡 لینک رو برای دوستات بفرست. اون‌ها که تازه‌ان، بعد از عضو شدن کانال، جایزه می‌گیرن!",
+            f"<code>{invite_link}</code>",
             parse_mode=ParseMode.HTML,
             reply_markup=invite_keyboard(invite_link),
             disable_web_page_preview=True,
         )
         return
 
+    # ─── تایید حمله ───
+    if data.startswith("attack_confirm_"):
+        try:
+            target_id = int(data.replace("attack_confirm_", ""))
+        except ValueError:
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        await execute_attack(update, context, user, target_id)
+        return
+
+    if data == "attack_cancel":
+        await query.edit_message_text(
+            "❌ حمله لغو شد.",
+            reply_markup=back_keyboard(),
+        )
+        return
+
 
 # ─────────────────────────────────────────────
-# راهنما، پروفایل، برترها
+# راهنما، پروفایل، برترها، منابع، حمله
 # ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
@@ -413,14 +515,9 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
-        if minutes > 0 and secs > 0:
-            cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه تا جایزه بعدی"
-        elif minutes > 0:
-            cooldown = f"⏳ {minutes} دقیقه تا جایزه بعدی"
-        else:
-            cooldown = f"⏳ {secs} ثانیه تا جایزه بعدی"
+        cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"⏳ {secs} ثانیه"
     else:
-        cooldown = "✅ آماده‌ی گرفتن جایزه‌ای!"
+        cooldown = "✅ آماده"
 
     name = db_user.first_name or "دوست عزیز"
     username = f"@{db_user.username}" if db_user.username else "ندارد"
@@ -463,6 +560,212 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    try:
+        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        return
+
+    if db_user.pads < 6000:
+        await update.message.reply_text(
+            "🔒 بخش منابع وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    await update.message.reply_text(
+        f"🎒 <b>منابع تو</b>\n\n"
+        f"🥩 گوشت: <b>{db_user.meat}</b>\n"
+        f"🍵 چای: <b>{db_user.tea}</b>\n"
+        f"🧱 آجر: <b>{db_user.bricks}</b>\n"
+        f"🥖 نون بربری: <b>{db_user.bread_count}</b>\n"
+        f"🍰 کیک یزدی: <b>{db_user.cake}</b>\n"
+        f"🔪 سیفید: <b>{db_user.shields}</b>\n\n"
+        f"⚔️ <b>جنگجوها:</b>\n"
+        f"🔪 کارگر افغانی: <b>{db_user.workers}</b>\n"
+        f"🛡️ لر: <b>{db_user.lords}</b>",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """کاربر می‌نویسه «حمله» → یه نفر رندم انتخاب می‌شه."""
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    try:
+        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        return
+
+    # چک باز شدن بخش جنگ
+    if db_user.pads < 6000:
+        await update.message.reply_text(
+            "🔒 بخش جنگ وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if db_user.workers < 1:
+        await update.message.reply_text(
+            "❌ کارگر افغانی نداری! از فروشگاه بخر.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # انتخاب یه نفر رندم
+    target = await get_random_user_in_group(context, update.effective_chat.id, user.id)
+    if target is None:
+        await update.message.reply_text("❌ کسی برای حمله پیدا نشد!")
+        return
+
+    target_name = target.first_name or target.username or "کاربر"
+
+    await update.message.reply_text(
+        f"⚔️ <b>آماده‌ی حمله به {target_name} هستی!</b>\n\n"
+        f"🔪 کارگرهای افغانی تو: <b>{db_user.workers}</b>\n"
+        f"🛡️ لرهای حریف: <b>{target.lords}</b>\n\n"
+        f"تایید می‌کنی؟",
+        parse_mode=ParseMode.HTML,
+        reply_markup=attack_keyboard(target.telegram_id),
+    )
+
+
+async def execute_attack(update, context, user, target_id: int) -> None:
+    """حمله رو اجرا می‌کنه."""
+    query = update.callback_query
+
+    try:
+        attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        defender = await get_user_by_id(target_id)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        await query.edit_message_text("❌ خطا در حمله.", reply_markup=back_keyboard())
+        return
+
+    if defender is None:
+        await query.edit_message_text("❌ حریف پیدا نشد.", reply_markup=back_keyboard())
+        return
+
+    # فرمول: هر کارگر افغانی = ۱.۴ لر
+    workers = attacker.workers
+    lords = defender.lords
+
+    # آجر پرت‌شده توسط لرها
+    bricks_thrown = lords * 14  # هر لر ۱۴ آجر پرت می‌کنه
+
+    # اگه لرها بیشتر از ۱.۴ برابر کارگرها باشن، حمله شکست می‌خوره
+    if lords >= workers * 1.4:
+        # حمله شکست خورد، کارگرها می‌میرن
+        await update_resources(user.id, workers=0)
+        await query.edit_message_text(
+            f"💥 <b>حمله شکست خورد!</b>\n\n"
+            f"🛡️ لرهای حریف <b>{bricks_thrown}</b> آجر پرت کردن!\n"
+            f"🔪 تمام <b>{workers}</b> کارگر افغانی تو کشته شدن. 🪦",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+    # حمله موفق — دزدی
+    stolen_meat = min(50, defender.meat)
+    stolen_tea = min(25, defender.tea)
+
+    await update_resources(
+        user.id,
+        workers=0,  # کارگرها قربانی می‌شن
+        meat=attacker.meat + stolen_meat,
+        tea=attacker.tea + stolen_tea,
+    )
+    await update_resources(
+        target_id,
+        meat=defender.meat - stolen_meat,
+        tea=defender.tea - stolen_tea,
+    )
+
+    await query.edit_message_text(
+        f"🎉 <b>حمله موفق!</b>\n\n"
+        f"🥩 <b>{stolen_meat}</b> گوشت دزدیدی!\n"
+        f"🍵 <b>{stolen_tea}</b> چای دزدیدی!\n\n"
+        f"🔪 <b>{workers}</b> کارگر افغانی تو قربانی شدن.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=back_keyboard(),
+    )
+
+
+async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """پرت کردن سیفید: «پرت سیفید [آی‌دی/یوزرنیم] [تعداد]»"""
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    text = update.message.text.strip()
+
+    # فرمت: پرت سیفید 123456789 50 یا پرت سیفید @ali 50
+    parts = text.split()
+    if len(parts) < 4:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n<code>پرت سیفید [آی‌دی عددی/یوزرنیم] [تعداد]</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    target_str = parts[2]
+    try:
+        amount = int(parts[3])
+    except ValueError:
+        await update.message.reply_text("❌ تعداد باید عدد باشه!")
+        return
+
+    try:
+        sender, _ = await get_or_create_user(user.id, user.username, user.first_name)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        return
+
+    if sender.shields < amount:
+        await update.message.reply_text(
+            f"❌ سیفید کافی نداری!\nموجودی: <b>{sender.shields}</b>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # پیدا کردن گیرنده
+    target_user = None
+    if target_str.startswith("@"):
+        target_user = await get_user_by_username(target_str)
+    else:
+        try:
+            target_id = int(target_str)
+            target_user = await get_user_by_id(target_id)
+        except ValueError:
+            pass
+
+    if target_user is None:
+        await update.message.reply_text("❌ کاربر پیدا نشد!")
+        return
+
+    if target_user.telegram_id == user.id:
+        await update.message.reply_text("❌ نمی‌تونی به خودت سیفید پرت کنی!")
+        return
+
+    success = await transfer_shields(user.id, target_user.telegram_id, amount)
+
+    if success:
+        target_name = target_user.first_name or target_user.username or "کاربر"
+        await update.message.reply_text(
+            f"🎁 <b>{amount} سیفید</b> به <b>{target_name}</b> پرت کردی!",
+            parse_mode=ParseMode.HTML,
+        )
+
+
 # ─────────────────────────────────────────────
 # کلمات کلیدی و دستورات متنی
 # ─────────────────────────────────────────────
@@ -475,6 +778,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
+    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -484,16 +788,24 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if text in (CMD_TOP, "برتر"):
         await top_handler(update, context)
         return
+    if text == CMD_RESOURCES:
+        await resources_handler(update, context)
+        return
+    if text == CMD_ATTACK:
+        await attack_handler(update, context)
+        return
+    if text.startswith("پرت سیفید"):
+        await transfer_shield_handler(update, context)
+        return
 
+    # کلمات کلیدی
     if text not in KEYWORDS:
         return
 
     points, required_pads = KEYWORDS[text]
 
     try:
-        db_user, _ = await get_or_create_user(
-            user.id, user.username, user.first_name
-        )
+        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
@@ -510,9 +822,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(
             f"🔒 <b>{text}</b> هنوز برات باز نشده!\n\n"
             f"💎 پدهای فعلی: <b>{db_user.pads}</b>\n"
-            f"🎯 برای باز شدن <b>{text}</b>، باید حداقل <b>{required_pads}</b> پد داشته باشی.\n\n"
-            f"📉 <b>{needed} پد</b> دیگه لازم داری.\n\n"
-            f"💡 فقط با <b>گل رز</b> (۲ پد) می‌تونی پد جمع کنی!",
+            f"🎯 نیاز: <b>{required_pads}</b> پد\n"
+            f"📉 <b>{needed} پد</b> دیگه لازم داری.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -521,12 +832,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if remaining > 0:
         minutes = remaining // 60
         secs = remaining % 60
-        if minutes > 0 and secs > 0:
-            wait_text = f"{minutes} دقیقه و {secs} ثانیه"
-        elif minutes > 0:
-            wait_text = f"{minutes} دقیقه"
-        else:
-            wait_text = f"{secs} ثانیه"
+        wait_text = f"{minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"{secs} ثانیه"
 
         await update.message.reply_text(
             f"😅 می‌بینم که خوشت اومده!\n\n"
@@ -544,31 +850,22 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
+    # اگه کلمه منابع اضافه می‌کنه
+    if text == "نون بربری":
+        await update_resources(user.id, bread_count=updated.bread_count + 5)
+    elif text == "آجر":
+        await update_resources(user.id, bricks=updated.bricks + 5)
+    elif text == "سیفید":
+        await update_resources(user.id, shields=updated.shields + 5)
+
     bread_msg = ""
     if text == "نون بربری":
-        try:
-            await mark_bread_used(user.id)
-            bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
-        except Exception as exc:
-            logger.exception("DB error: %s", exc)
-
-    unlock_msg = ""
-    if updated.pads >= 500 and db_user.pads < 500:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>دختر خوب</b> و <b>پسر خوب</b> هم بزنی!"
-    elif updated.pads >= 1000 and db_user.pads < 1000:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>نون بربری</b> هم بزنی!"
-    elif updated.pads >= 3000 and db_user.pads < 3000:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>آجر</b> هم بزنی!"
-    elif updated.pads >= 6000 and db_user.pads < 6000:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>شمع</b> هم بزنی!"
-    elif updated.pads >= 10000 and db_user.pads < 10000:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>سیفید</b> هم بزنی!"
-    elif updated.pads >= 20000 and db_user.pads < 20000:
-        unlock_msg = "\n\n🎉 <b>تبریک!</b> حالا می‌تونی <b>شومپد</b> هم بزنی!"
+        await mark_bread_used(user.id)
+        bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
     await update.message.reply_text(
         f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
         f"💎 پد هات : <b>{updated.pads}</b>\n\n"
-        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{unlock_msg}{bread_msg}",
+        f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{bread_msg}",
         parse_mode=ParseMode.HTML,
     )
