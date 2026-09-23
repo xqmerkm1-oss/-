@@ -19,7 +19,7 @@ class User(Base):
     # ─── پد ───
     pads: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # ─── قفل نون بربری ───
+    # ─── قفل نون بربری (اگه زد، دختر خوب/پسر خوب قفل می‌شن) ───
     bread_used: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
@@ -33,8 +33,8 @@ class User(Base):
     shields: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # ─── جنگجوها ───
-    workers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    lords: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    workers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)   # کارگر افغانی
+    lords: Mapped[int] = mapped_column(Integer, default=0, nullable=False)     # لر
 
     # ─── سیستم دعوت ───
     invited_by: Mapped[int | None] = mapped_column(
