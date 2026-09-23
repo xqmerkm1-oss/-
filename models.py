@@ -16,19 +16,37 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
+    # ─── پد ───
     pads: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # ─── قفل نون بربری ───
     bread_used: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
 
-    # 🆕 سیستم دعوت
+    # ─── منابع ───
+    meat: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
+    tea: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    bricks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bread_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cake: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shields: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # ─── جنگجوها ───
+    workers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lords: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # ─── سیستم دعوت ───
     invited_by: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, default=None
     )
     invite_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # ─── زمان‌ها ───
     last_reward_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    last_shield_shown: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
 
