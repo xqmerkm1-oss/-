@@ -1,4 +1,3 @@
-# main.py
 import logging
 
 from telegram import Update
