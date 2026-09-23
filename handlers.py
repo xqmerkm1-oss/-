@@ -7,11 +7,17 @@ from telegram.ext import ContextTypes
 from keyboards import (
     attack_keyboard,
     back_keyboard,
+    help_back_keyboard,
     help_keyboard,
     shop_keyboard,
     start_keyboard,
 )
-from messages import HELP_TEXT, START_TEXT
+from messages import (
+    HELP_FULL_TEXT,
+    HELP_MENU_TEXT,
+    HELP_SHORT_TEXT,
+    START_TEXT,
+)
 from repository import (
     RESOURCE_MAP,
     add_pads,
@@ -254,6 +260,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
+    # ─── بازگشت ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -263,11 +270,42 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
+    # ─── بستن پنل ───
     if data == "menu_close":
         try:
             await query.message.delete()
         except Exception as exc:
             logger.exception("Delete error: %s", exc)
+        return
+
+    # ─── راهنما: توضیحات کوتاه ───
+    if data == "help_short":
+        await query.edit_message_text(
+            HELP_SHORT_TEXT,
+            parse_mode=ParseMode.HTML,
+            reply_markup=help_back_keyboard(),
+            disable_web_page_preview=True,
+        )
+        return
+
+    # ─── راهنما: توضیحات کامل ───
+    if data == "help_full":
+        await query.edit_message_text(
+            HELP_FULL_TEXT,
+            parse_mode=ParseMode.HTML,
+            reply_markup=help_back_keyboard(),
+            disable_web_page_preview=True,
+        )
+        return
+
+    # ─── بازگشت به راهنمای اصلی ───
+    if data == "help_back":
+        await query.edit_message_text(
+            HELP_MENU_TEXT,
+            parse_mode=ParseMode.HTML,
+            reply_markup=help_keyboard(),
+            disable_web_page_preview=True,
+        )
         return
 
     # ─── حساب من ───
@@ -506,7 +544,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.message is None:
         return
     await update.message.reply_text(
-        HELP_TEXT,
+        HELP_MENU_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=help_keyboard(),
         disable_web_page_preview=True,
@@ -774,14 +812,7 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 # انتقال منابع توسط سازنده‌ها (نامحدود)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال هر منبعی توسط سازنده‌ها — نامحدود.
-
-    فرمت‌ها:
-    - انتقال پد 1000 7803165903
-    - انتقال گوشت 500 @ali
-    - انتقال گل رز 100 1844792522
-    - انتقال پد 1000 (با ریپلای)
-    """
+    """انتقال هر منبعی توسط سازنده‌ها — نامحدود."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -899,13 +930,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال هر منبعی توسط سازنده‌ها — نامحدود.
-
-    فرمت‌ها:
-    - حذف انتقال پد 1000 7803165903
-    - حذف انتقال گوشت 500 @ali
-    - حذف انتقال گل رز 100 1844792522
-    """
+    """حذف انتقال هر منبعی توسط سازنده‌ها — نامحدود."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1094,7 +1119,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    # 🎯 افزایش منبع خاص
+    # افزایش منبع خاص
     resource_column = KEYWORD_RESOURCE.get(text)
     if resource_column is not None:
         current_val = getattr(updated, resource_column)
