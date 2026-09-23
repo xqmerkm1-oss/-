@@ -1,5 +1,8 @@
+import asyncio
 import logging
 
+from alembic import command
+from alembic.config import Config
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -10,7 +13,6 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN
-from database import init_db
 from handlers import (
     check_membership_callback,
     menu_callback,
@@ -25,8 +27,20 @@ logging.basicConfig(
 logger = logging.getLogger("shomped")
 
 
+def run_migrations():
+    """Alembic migration رو اجرا می‌کنه."""
+    try:
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("✅ دیتابیس migrate شد.")
+    except Exception as exc:
+        logger.exception("Alembic error: %s", exc)
+
+
 async def on_startup(app: Application) -> None:
-    await init_db()
+    # migration توی thread جداگانه (چون sync هست)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, run_migrations)
     logger.info("✅ دیتابیس آماده است.")
 
 
