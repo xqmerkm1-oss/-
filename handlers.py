@@ -1,6 +1,4 @@
 import logging
-import random
-import re
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -257,9 +255,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── حساب من ───
     if data == "menu_profile":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
@@ -313,9 +309,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── فروشگاه ───
     if data == "menu_shop":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
@@ -338,9 +332,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── خرید کارگر افغانی ───
     if data == "shop_buy_worker":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.answer("❌ خطا", show_alert=True)
@@ -364,9 +356,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── خرید لر ───
     if data == "shop_buy_lord":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.answer("❌ خطا", show_alert=True)
@@ -390,9 +380,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── خرید کیک یزدی ───
     if data == "shop_buy_cake":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.answer("❌ خطا", show_alert=True)
@@ -442,9 +430,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # ─── دعوت دوستان ───
     if data == "menu_invite":
         try:
-            db_user, _ = await get_or_create_user(
-                user.id, user.username, user.first_name
-            )
+            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
@@ -594,7 +580,6 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """کاربر می‌نویسه «حمله» → یه نفر رندم انتخاب می‌شه."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -605,7 +590,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.exception("DB error: %s", exc)
         return
 
-    # چک باز شدن بخش جنگ
     if db_user.pads < 6000:
         await update.message.reply_text(
             "🔒 بخش جنگ وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
@@ -620,7 +604,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # انتخاب یه نفر رندم
     target = await get_random_user_in_group(context, update.effective_chat.id, user.id)
     if target is None:
         await update.message.reply_text("❌ کسی برای حمله پیدا نشد!")
@@ -639,7 +622,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def execute_attack(update, context, user, target_id: int) -> None:
-    """حمله رو اجرا می‌کنه."""
     query = update.callback_query
 
     try:
@@ -654,16 +636,11 @@ async def execute_attack(update, context, user, target_id: int) -> None:
         await query.edit_message_text("❌ حریف پیدا نشد.", reply_markup=back_keyboard())
         return
 
-    # فرمول: هر کارگر افغانی = ۱.۴ لر
     workers = attacker.workers
     lords = defender.lords
+    bricks_thrown = lords * 14
 
-    # آجر پرت‌شده توسط لرها
-    bricks_thrown = lords * 14  # هر لر ۱۴ آجر پرت می‌کنه
-
-    # اگه لرها بیشتر از ۱.۴ برابر کارگرها باشن، حمله شکست می‌خوره
     if lords >= workers * 1.4:
-        # حمله شکست خورد، کارگرها می‌میرن
         await update_resources(user.id, workers=0)
         await query.edit_message_text(
             f"💥 <b>حمله شکست خورد!</b>\n\n"
@@ -674,13 +651,12 @@ async def execute_attack(update, context, user, target_id: int) -> None:
         )
         return
 
-    # حمله موفق — دزدی
     stolen_meat = min(50, defender.meat)
     stolen_tea = min(25, defender.tea)
 
     await update_resources(
         user.id,
-        workers=0,  # کارگرها قربانی می‌شن
+        workers=0,
         meat=attacker.meat + stolen_meat,
         tea=attacker.tea + stolen_tea,
     )
@@ -701,14 +677,12 @@ async def execute_attack(update, context, user, target_id: int) -> None:
 
 
 async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """پرت کردن سیفید: «پرت سیفید [آی‌دی/یوزرنیم] [تعداد]»"""
     if update.message is None or update.effective_user is None:
         return
 
     user = update.effective_user
     text = update.message.text.strip()
 
-    # فرمت: پرت سیفید 123456789 50 یا پرت سیفید @ali 50
     parts = text.split()
     if len(parts) < 4:
         await update.message.reply_text(
@@ -737,7 +711,6 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
         )
         return
 
-    # پیدا کردن گیرنده
     target_user = None
     if target_str.startswith("@"):
         target_user = await get_user_by_username(target_str)
@@ -778,7 +751,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -798,7 +770,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # کلمات کلیدی
     if text not in KEYWORDS:
         return
 
@@ -850,7 +821,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    # اگه کلمه منابع اضافه می‌کنه
     if text == "نون بربری":
         await update_resources(user.id, bread_count=updated.bread_count + 5)
     elif text == "آجر":
