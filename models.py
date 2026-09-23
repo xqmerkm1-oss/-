@@ -16,7 +16,8 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    pads: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # 🎯 BigInteger برای پشتیبانی از اعداد بزرگ
+    pads: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     bread_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # منابع
