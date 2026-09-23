@@ -1,7 +1,4 @@
-import asyncio
 import logging
-import subprocess
-import sys
 
 from telegram import Update
 from telegram.ext import (
@@ -13,6 +10,7 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN
+from database import init_db
 from handlers import (
     check_membership_callback,
     menu_callback,
@@ -27,37 +25,8 @@ logging.basicConfig(
 logger = logging.getLogger("shomped")
 
 
-def run_migrations():
-    """Alembic migration رو اجرا می‌کنه."""
-    try:
-        # ساخت migration جدید (فقط اگه تغییر باشه)
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic", "revision", "--autogenerate", "-m", "auto"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logger.warning(f"Alembic revision: {result.stderr}")
-
-        # اجرای migration
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logger.warning(f"Alembic upgrade: {result.stderr}")
-        else:
-            logger.info("✅ Migration انجام شد.")
-    except Exception as exc:
-        logger.exception("Alembic error: %s", exc)
-
-
 async def on_startup(app: Application) -> None:
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, run_migrations)
+    await init_db()
     logger.info("✅ دیتابیس آماده است.")
 
 
@@ -69,12 +38,22 @@ def build_application() -> Application:
         .build()
     )
 
+    # عضویت اجباری
     app.add_handler(
-        CallbackQueryHandler(check_membership_callback, pattern="^check_membership$")
+        CallbackQueryHandler(
+            check_membership_callback,
+            pattern=r"^check_membership$",
+        )
     )
+
+    # همه دکمه‌های دیگه (menu_, shop_, attack_)
     app.add_handler(
-        CallbackQueryHandler(menu_callback, pattern="^menu_|^shop_|^attack_")
+        CallbackQueryHandler(
+            menu_callback,
+            pattern=r"^(menu_|shop_|attack_)",
+        )
     )
+
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
