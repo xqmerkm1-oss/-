@@ -45,9 +45,28 @@ def back_keyboard() -> InlineKeyboardMarkup:
 
 
 def help_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [_btn("🔙 بستن", callback_data="menu_close", style="danger")],
-    ])
+    """دکمه‌های راهنمای اصلی (سه دکمه)."""
+    keyboard = [
+        [
+            _btn("📘 توضیحات کوتاه", callback_data="help_short", style="primary"),
+            _btn("📚 توضیحات کامل", callback_data="help_full", style="success"),
+        ],
+        [
+            _btn("🔙 بستن", callback_data="menu_close", style="danger"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def help_back_keyboard() -> InlineKeyboardMarkup:
+    """دکمه بازگشت به راهنمای اصلی."""
+    keyboard = [
+        [
+            _btn("🔙 بازگشت به راهنما", callback_data="help_back", style="primary"),
+            _btn("❌ بستن", callback_data="menu_close", style="danger"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 
 def shop_keyboard() -> InlineKeyboardMarkup:
