@@ -8,6 +8,24 @@ from models import User
 COOLDOWN_SECONDS = 180
 
 
+# 🎯 نقشه‌ی اسم منبع به ستون دیتابیس
+RESOURCE_MAP = {
+    "پد": "pads",
+    "گوشت": "meat",
+    "چای": "tea",
+    "آجر": "bricks",
+    "نون بربری": "bread_count",
+    "کیک یزدی": "cake",
+    "سیفید": "shields",
+    "کارگر افغانی": "workers",
+    "لر": "lords",
+    "گل رز": "pad_rose",
+    "دختر خوب": "pad_girl",
+    "پسر خوب": "pad_boy",
+    "شمع": "pad_candle",
+}
+
+
 async def get_or_create_user(
     telegram_id: int,
     username: str | None = None,
@@ -124,6 +142,10 @@ async def update_resources(
     shields: int | None = None,
     workers: int | None = None,
     lords: int | None = None,
+    pad_rose: int | None = None,
+    pad_girl: int | None = None,
+    pad_boy: int | None = None,
+    pad_candle: int | None = None,
 ) -> User | None:
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -149,6 +171,14 @@ async def update_resources(
             user.workers = max(0, workers)
         if lords is not None:
             user.lords = max(0, lords)
+        if pad_rose is not None:
+            user.pad_rose = max(0, pad_rose)
+        if pad_girl is not None:
+            user.pad_girl = max(0, pad_girl)
+        if pad_boy is not None:
+            user.pad_boy = max(0, pad_boy)
+        if pad_candle is not None:
+            user.pad_candle = max(0, pad_candle)
 
         await session.commit()
         await session.refresh(user)
@@ -171,6 +201,39 @@ async def transfer_shields(from_id: int, to_id: int, amount: int) -> bool:
         receiver.shields += amount
         await session.commit()
         return True
+
+
+async def transfer_resource(
+    from_id: int, to_id: int, resource_name: str, amount: int
+) -> tuple[bool, int, int]:
+    """منبع رو از یه کاربر به کاربر دیگه منتقل می‌کنه.
+
+    مقدار برگشتی: (موفق؟, مقدار جدید فرستنده, مقدار جدید گیرنده)
+    """
+    column = RESOURCE_MAP.get(resource_name)
+    if column is None:
+        return False, 0, 0
+
+    async with AsyncSessionLocal() as session:
+        r1 = await session.execute(select(User).where(User.telegram_id == from_id))
+        sender = r1.scalar_one_or_none()
+        if sender is None:
+            return False, 0, 0
+
+        r2 = await session.execute(select(User).where(User.telegram_id == to_id))
+        receiver = r2.scalar_one_or_none()
+        if receiver is None:
+            return False, 0, 0
+
+        sender_val = getattr(sender, column)
+        receiver_val = getattr(receiver, column)
+
+        setattr(sender, column, sender_val - amount)
+        setattr(receiver, column, receiver_val + amount)
+
+        await session.commit()
+
+        return True, sender_val - amount, receiver_val + amount
 
 
 def seconds_remaining(user: User) -> int:
