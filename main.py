@@ -42,7 +42,7 @@ def build_application() -> Application:
         CallbackQueryHandler(check_membership_callback, pattern="^check_membership$")
     )
     app.add_handler(
-        CallbackQueryHandler(menu_callback, pattern="^menu_")
+        CallbackQueryHandler(menu_callback, pattern="^menu_|^shop_|^attack_")
     )
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(
