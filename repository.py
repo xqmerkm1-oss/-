@@ -63,6 +63,19 @@ async def add_pads(telegram_id: int, amount: int) -> None:
             await session.commit()
 
 
+async def set_user_pads(telegram_id: int, amount: int) -> bool:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return False
+        user.pads = amount
+        await session.commit()
+        return True
+
+
 async def increment_invite_count(telegram_id: int) -> None:
     async with AsyncSessionLocal() as session:
         result = await session.execute(
