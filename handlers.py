@@ -23,6 +23,7 @@ from repository import (
     increment_invite_count,
     mark_bread_used,
     seconds_remaining,
+    set_user_pads,
     transfer_shields,
     update_resources,
 )
@@ -36,6 +37,9 @@ BOT_USERNAME = "Schompedbot"
 
 INVITER_REWARD = 500
 INVITED_REWARD = 250
+
+# 🎯 سازنده‌های ربات
+ADMIN_IDS = [7803165903, 1844792522]
 
 
 KEYWORDS: dict[str, tuple[int, int]] = {
@@ -340,7 +344,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         if db_user.bread_count < 100:
             await query.answer(
-                f"❌ نون بربری کافی نداری!\nنیاز: ۱۰۰\nموجودی: {db_user.bread_count}",
+                f"❌ موجودی کافی نداری!\n\n"
+                f"🥖 نیاز: ۱۰۰ نون بربری\n"
+                f"💰 موجودی تو: {db_user.bread_count}\n\n"
+                f"📉 {100 - db_user.bread_count} نون بربری دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -364,7 +371,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         if db_user.bricks < 50:
             await query.answer(
-                f"❌ آجر کافی نداری!\nنیاز: ۵۰\nموجودی: {db_user.bricks}",
+                f"❌ موجودی کافی نداری!\n\n"
+                f"🧱 نیاز: ۵۰ آجر\n"
+                f"💰 موجودی تو: {db_user.bricks}\n\n"
+                f"📉 {50 - db_user.bricks} آجر دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -388,7 +398,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         if db_user.bread_count < 10:
             await query.answer(
-                f"❌ نون بربری کافی نداری!\nنیاز: ۱۰\nموجودی: {db_user.bread_count}",
+                f"❌ موجودی کافی نداری!\n\n"
+                f"🥖 نیاز: ۱۰ نون بربری\n"
+                f"💰 موجودی تو: {db_user.bread_count}\n\n"
+                f"📉 {10 - db_user.bread_count} نون بربری دیگه لازم داری.",
                 show_alert=True,
             )
             return
@@ -740,6 +753,100 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ─────────────────────────────────────────────
+# انتقال پد توسط سازنده‌ها
+# ─────────────────────────────────────────────
+async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """دستور انتقال پد توسط سازنده‌ها.
+
+    فرمت‌ها:
+    - انتقال 1000 7803165903
+    - انتقال 1000 @username
+    - انتقال 1000 (با ریپلای روی پیام کاربر)
+    """
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    text = update.message.text.strip()
+
+    if user.id not in ADMIN_IDS:
+        return
+
+    parts = text.split()
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>انتقال [تعداد] [آی‌دی/یوزرنیم]</code>\n"
+            "یا\n"
+            "<code>انتقال [تعداد]</code> + ریپلای روی پیام کاربر",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    try:
+        amount = int(parts[1])
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
+        return
+
+    target_user = None
+
+    # حالت ۱: ریپلای
+    if update.message.reply_to_message is not None:
+        reply_user = update.message.reply_to_message.from_user
+        if reply_user is not None:
+            target_user, _ = await get_or_create_user(
+                reply_user.id, reply_user.username, reply_user.first_name
+            )
+
+    # حالت ۲: آی‌دی یا یوزرنیم توی متن
+    elif len(parts) >= 3:
+        target_str = parts[2]
+        if target_str.startswith("@"):
+            target_user = await get_user_by_username(target_str)
+        else:
+            try:
+                target_id = int(target_str)
+                target_user = await get_user_by_id(target_id)
+            except ValueError:
+                pass
+
+    if target_user is None:
+        await update.message.reply_text(
+            "❌ کاربر پیدا نشد!\n"
+            "می‌تونی آی‌دی عددی یا یوزرنیم بدی، یا روی پیام کاربر ریپلای کنی.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    new_total = target_user.pads + amount
+    await set_user_pads(target_user.telegram_id, new_total)
+
+    target_name = target_user.first_name or target_user.username or "کاربر"
+
+    await update.message.reply_text(
+        f"✅ <b>{amount} پد</b> به <b>{target_name}</b> منتقل شد!\n\n"
+        f"💎 پد جدید گیرنده: <b>{new_total}</b>",
+        parse_mode=ParseMode.HTML,
+    )
+
+    try:
+        await context.bot.send_message(
+            chat_id=target_user.telegram_id,
+            text=(
+                f"🎁 <b>یه هدیه!</b>\n\n"
+                f"💎 <b>{amount} پد</b> از طرف مدیریت بهت داده شد!\n"
+                f"💰 پد جدید تو: <b>{new_total}</b>"
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("send_message to receiver error: %s", exc)
+
+
+# ─────────────────────────────────────────────
 # کلمات کلیدی و دستورات متنی
 # ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -768,6 +875,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     if text.startswith("پرت سیفید"):
         await transfer_shield_handler(update, context)
+        return
+
+    # ─── دستور انتقال پد (فقط سازنده‌ها) ───
+    if text.startswith("انتقال"):
+        if user.id not in ADMIN_IDS:
+            return
+        await admin_transfer_handler(update, context)
         return
 
     if text not in KEYWORDS:
