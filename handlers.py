@@ -301,7 +301,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"📛 نام: <b>{name}</b>\n"
             f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
             f"🔗 یوزرنیم: <b>{username}</b>\n"
-            f"💎 پدها: <b>{db_user.pads}</b>\n"
+            f"💎 پدها: <b>{db_user.pads:,}</b>\n"
             f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
             f"⏳ وضعیت جایزه: {cooldown}\n\n"
             f"{unlock_status}{bread_status}",
@@ -431,7 +431,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
         for i, u in enumerate(top_users):
             name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پد")
+            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
 
         await query.edit_message_text(
             "\n".join(lines),
@@ -526,7 +526,7 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"📛 نام: <b>{name}</b>\n"
         f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
         f"🔗 یوزرنیم: <b>{username}</b>\n"
-        f"💎 پدها: <b>{db_user.pads}</b>\n"
+        f"💎 پدها: <b>{db_user.pads:,}</b>\n"
         f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
         f"⏳ وضعیت: {cooldown}",
         parse_mode=ParseMode.HTML,
@@ -551,7 +551,7 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
     for i, u in enumerate(top_users):
         name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads} پد")
+        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
 
     await update.message.reply_text(
         "\n".join(lines),
@@ -753,15 +753,15 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ─────────────────────────────────────────────
-# انتقال پد توسط سازنده‌ها
+# انتقال پد توسط سازنده‌ها (نامحدود)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال پد توسط سازنده‌ها.
+    """انتقال پد توسط سازنده‌ها — نامحدود.
 
     فرمت‌ها:
     - انتقال 1000 7803165903
     - انتقال 1000 @username
-    - انتقال 1000 (با ریپلای روی پیام کاربر)
+    - انتقال 1000 (با ریپلای)
     """
     if update.message is None or update.effective_user is None:
         return
@@ -824,8 +824,8 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     target_name = target_user.first_name or target_user.username or "کاربر"
 
     await update.message.reply_text(
-        f"✅ <b>{amount} پد</b> به <b>{target_name}</b> منتقل شد!\n\n"
-        f"💎 پد جدید گیرنده: <b>{new_total}</b>",
+        f"✅ <b>{amount:,} پد</b> به <b>{target_name}</b> منتقل شد!\n\n"
+        f"💎 پد جدید گیرنده: <b>{new_total:,}</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -834,8 +834,8 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             chat_id=target_user.telegram_id,
             text=(
                 f"🎁 <b>یه هدیه از طرف مدیریت!</b>\n\n"
-                f"💎 <b>{amount} پد</b> بهت داده شد.\n"
-                f"💰 پد جدید تو: <b>{new_total}</b>"
+                f"💎 <b>{amount:,} پد</b> بهت داده شد.\n"
+                f"💰 پد جدید تو: <b>{new_total:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -848,8 +848,8 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             text=(
                 f"📤 <b>انتقال انجام شد</b>\n\n"
                 f"👤 گیرنده: <b>{target_name}</b>\n"
-                f"💎 مقدار: <b>{amount} پد</b>\n"
-                f"💰 پد جدید گیرنده: <b>{new_total}</b>"
+                f"💎 مقدار: <b>{amount:,} پد</b>\n"
+                f"💰 پد جدید گیرنده: <b>{new_total:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -858,14 +858,14 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال پد توسط سازنده‌ها.
+    """حذف انتقال پد توسط سازنده‌ها — نامحدود.
 
-    پد از گیرنده کم می‌شه و به سازنده برمی‌گرده.
+    پد از گیرنده کم می‌شه (حتی اگه منفی بشه) و به سازنده برمی‌گرده.
 
     فرمت‌ها:
     - حذف انتقال 1000 7803165903
     - حذف انتقال 1000 @username
-    - حذف انتقال 1000 (با ریپلای روی پیام کاربر)
+    - حذف انتقال 1000 (با ریپلای)
     """
     if update.message is None or update.effective_user is None:
         return
@@ -921,13 +921,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    if target_user.pads < amount:
-        await update.message.reply_text(
-            f"❌ این کاربر فقط <b>{target_user.pads} پد</b> داره! نمی‌شه <b>{amount} پد</b> ازش کم کرد.",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
+    # 🎯 بدون چک موجودی — حتی اگه منفی بشه
     new_total = target_user.pads - amount
     await set_user_pads(target_user.telegram_id, new_total)
 
@@ -938,9 +932,9 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     target_name = target_user.first_name or target_user.username or "کاربر"
 
     await update.message.reply_text(
-        f"✅ <b>{amount} پد</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
-        f"💎 پد جدید گیرنده: <b>{new_total}</b>\n"
-        f"💰 پد جدید تو: <b>{sender_new_total}</b>",
+        f"✅ <b>{amount:,} پد</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
+        f"💎 پد جدید گیرنده: <b>{new_total:,}</b>\n"
+        f"💰 پد جدید تو: <b>{sender_new_total:,}</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -949,8 +943,8 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             chat_id=target_user.telegram_id,
             text=(
                 f"⚠️ <b>اطلاعیه مدیریت</b>\n\n"
-                f"💎 <b>{amount} پد</b> ازت پس گرفته شد.\n"
-                f"💰 پد جدید تو: <b>{new_total}</b>"
+                f"💎 <b>{amount:,} پد</b> ازت پس گرفته شد.\n"
+                f"💰 پد جدید تو: <b>{new_total:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -963,9 +957,9 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             text=(
                 f"📥 <b>حذف انتقال انجام شد</b>\n\n"
                 f"👤 کاربر: <b>{target_name}</b>\n"
-                f"💎 مقدار: <b>{amount} پد</b>\n"
-                f"💰 پد جدید گیرنده: <b>{new_total}</b>\n"
-                f"💰 پد جدید تو: <b>{sender_new_total}</b>"
+                f"💎 مقدار: <b>{amount:,} پد</b>\n"
+                f"💰 پد جدید گیرنده: <b>{new_total:,}</b>\n"
+                f"💰 پد جدید تو: <b>{sender_new_total:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -1040,9 +1034,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         needed = required_pads - db_user.pads
         await update.message.reply_text(
             f"🔒 <b>{text}</b> هنوز برات باز نشده!\n\n"
-            f"💎 پدهای فعلی: <b>{db_user.pads}</b>\n"
-            f"🎯 نیاز: <b>{required_pads}</b> پد\n"
-            f"📉 <b>{needed} پد</b> دیگه لازم داری.",
+            f"💎 پدهای فعلی: <b>{db_user.pads:,}</b>\n"
+            f"🎯 نیاز: <b>{required_pads:,}</b> پد\n"
+            f"📉 <b>{needed:,} پد</b> دیگه لازم داری.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1083,7 +1077,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(
         f"🎉 <b>{points} {text} پد گرفتی</b>\n\n"
-        f"💎 پد هات : <b>{updated.pads}</b>\n\n"
+        f"💎 پد هات : <b>{updated.pads:,}</b>\n\n"
         f"⏳ <b>۳ دقیقه</b> دیگه می‌تونی دوباره بگیری{bread_msg}",
         parse_mode=ParseMode.HTML,
     )
