@@ -20,7 +20,7 @@ class User(Base):
     pads: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     bread_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # منبع‌ها
+    # منابع
     meat: Mapped[int] = mapped_column(BigInteger, default=200, nullable=False)
     tea: Mapped[int] = mapped_column(BigInteger, default=100, nullable=False)
     bricks: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
@@ -28,7 +28,7 @@ class User(Base):
     cake: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     shields: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
-    # منبع‌های تکی (هر کلمه کلیدی جدا)
+    # منبع‌های تکی
     pad_rose: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     pad_girl: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     pad_boy: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
