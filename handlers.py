@@ -60,7 +60,7 @@ ADMIN_IDS = [7803165903, 1844792522]
 
 TEHRAN_TZ = ZoneInfo("Asia/Tehran")
 
-HELP_TIMEOUT_SECONDS = 300  # ۵ دقیقه
+HELP_TIMEOUT_SECONDS = 300
 
 
 KEYWORDS: dict[str, tuple[int, int]] = {
@@ -91,6 +91,38 @@ CMD_TOP = "برترها"
 CMD_RESOURCES = "منابع"
 CMD_REPORT = "گزارش"
 CMD_SHOP = "فروشگاه"
+
+
+# ═════════════════════════════════════════════
+# 🎯 تابع ساخت نام + لینک کاربر
+# ═════════════════════════════════════════════
+def get_user_link(user, telegram_id: int) -> str:
+    """لینک قابل کلیک کاربر رو می‌سازه."""
+    name = "کاربر ناشناس"
+    if user is not None:
+        if user.first_name:
+            name = user.first_name
+        elif user.username:
+            name = f"@{user.username}"
+        else:
+            name = f"کاربر {telegram_id}"
+    else:
+        name = f"کاربر {telegram_id}"
+
+    # لینک تلگرام
+    link = f'<a href="tg://user?id={telegram_id}">{name}</a>'
+    return link
+
+
+def get_user_display_name(user, telegram_id: int) -> str:
+    """نام کاربر (بدون لینک)."""
+    if user is None:
+        return f"کاربر {telegram_id}"
+    if user.first_name:
+        return user.first_name
+    if user.username:
+        return f"@{user.username}"
+    return f"کاربر {telegram_id}"
 
 
 # ═════════════════════════════════════════════
@@ -160,8 +192,10 @@ def format_user_profile(db_user, remaining: int) -> str:
             f"💀 {remaining_days} روز دیگه تا مرگ جنگجوها!\n"
         )
 
+    user_link = f'<a href="tg://user?id={db_user.telegram_id}">{name}</a>'
+
     return (
-        f"👤 <b>پروفایل {name}</b>\n\n"
+        f"👤 <b>پروفایل {user_link}</b>\n\n"
         f"📛 نام: <b>{name}</b>\n"
         f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
         f"🔗 یوزرنیم: <b>{username}</b>\n\n"
@@ -333,7 +367,6 @@ async def bot_left_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # نمایش فروشگاه
 # ═════════════════════════════════════════════
 async def shop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """نمایش فروشگاه توی گروه."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -651,7 +684,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
-    # ─── بازگشت ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -661,7 +693,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بستن عمومی ───
     if data == "menu_close":
         try:
             await query.message.delete()
@@ -669,7 +700,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
-    # ─── راهنما: توضیحات کوتاه ───
+    # ─── راهنما ───
     if data.startswith("help_short_"):
         try:
             owner_id = int(data.replace("help_short_", ""))
@@ -694,7 +725,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── راهنما: توضیحات کامل ───
     if data.startswith("help_full_"):
         try:
             owner_id = int(data.replace("help_full_", ""))
@@ -719,7 +749,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── راهنما: بازگشت ───
     if data.startswith("help_back_"):
         try:
             owner_id = int(data.replace("help_back_", ""))
@@ -743,7 +772,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بستن قفل‌شده ───
     if data.startswith("menu_close_"):
         try:
             owner_id = int(data.replace("menu_close_", ""))
@@ -819,7 +847,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── خرید کارگر افغانی ───
+    # ─── خرید ───
     if data.startswith("shop_buy_worker_"):
         try:
             owner_id = int(data.replace("shop_buy_worker_", ""))
@@ -852,7 +880,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── خرید لر ───
     if data.startswith("shop_buy_lord_"):
         try:
             owner_id = int(data.replace("shop_buy_lord_", ""))
@@ -885,7 +912,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── خرید کیک یزدی ───
     if data.startswith("shop_buy_cake_"):
         try:
             owner_id = int(data.replace("shop_buy_cake_", ""))
@@ -918,7 +944,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── تایید خرید ───
     if data == "confirm_buy":
         buying = context.user_data.get("buying")
         if buying is None or "amount" not in buying:
@@ -986,7 +1011,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
-    # ─── لغو خرید ───
     if data == "cancel_buy":
         context.user_data.pop("buying", None)
         await query.edit_message_text("❌ خرید لغو شد.", reply_markup=back_keyboard())
@@ -1025,7 +1049,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
             return
 
-        target_name = target_user.first_name or target_user.username or "کاربر"
+        attacker_link = get_user_link(attacker, user.id)
+        target_link = get_user_link(target_user, target_id)
 
         context.user_data["war"] = {
             "attacker_id": user.id,
@@ -1039,8 +1064,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         await query.edit_message_text(
             f"📢 <b>درخواست حمله!</b>\n\n"
-            f"⚔️ حمله‌کننده: <b>{attacker.first_name}</b>\n"
-            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"⚔️ حمله‌کننده: {attacker_link}\n"
+            f"🆔 <code>{user.id}</code>\n\n"
+            f"🎯 هدف: {target_link}\n"
+            f"🆔 <code>{target_id}</code>\n\n"
             f"🔪 کارگرهای افغانی حمله‌کننده: <b>{attacker.workers:,}</b>\n"
             f"🛡️ لرهای هدف: <b>{target_user.lords:,}</b>\n"
             f"🧱 آجرهای هدف: <b>{target_user.bricks:,}</b>\n\n"
@@ -1086,12 +1113,13 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
         for i, u in enumerate(top_users):
             name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-            lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
+            link = get_user_link(u, u.telegram_id)
+            lines.append(f"{medals[i]} {link} — {u.pads:,} پد")
 
         await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
-    # ─── دعوت دوستان ───
+    # ─── دعوت ───
     if data == "menu_invite":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
@@ -1119,7 +1147,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ═════════════════════════════════════════════
-# اجرای جنگ داستانی
+# 🎬 اجرای جنگ داستانی (با لینک)
 # ═════════════════════════════════════════════
 async def execute_war(update, context, war: dict) -> None:
     query = update.callback_query
@@ -1142,15 +1170,17 @@ async def execute_war(update, context, war: dict) -> None:
     if target.meat <= 0 or target.tea <= 0:
         await query.edit_message_text(
             f"❌ <b>حمله لغو شد!</b>\n\n"
-            f"🎯 حریف: <b>{target.first_name or 'کاربر'}</b>\n\n"
+            f"🎯 حریف: {get_user_link(target, target_id)}\n\n"
             f"⚠️ این کاربر گوشت و چای نداره!",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
         return
 
-    attacker_name = attacker.first_name or "کاربر"
-    target_name = target.first_name or "کاربر"
+    attacker_name = get_user_display_name(attacker, attacker_id)
+    target_name = get_user_display_name(target, target_id)
+    attacker_link = get_user_link(attacker, attacker_id)
+    target_link = get_user_link(target, target_id)
 
     worker_count = attacker.workers
     lord_count = target.lords
@@ -1165,65 +1195,72 @@ async def execute_war(update, context, war: dict) -> None:
     remaining_workers = max(0, worker_count - workers_killed_by_lords)
     actual_workers_killed = min(worker_count, workers_killed_by_lords)
 
-    # صحنه ۱
+    # ─── صحنه ۱ ───
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل اول: آغاز</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🌅 <b>سپیده‌دم...</b>\n\n"
-        f"در دشتی پهناور، سپاه <b>{attacker_name}</b> آماده‌ی نبرد شد.\n"
-        f"<b>{worker_count:,}</b> کارگر افغانی با نیزه و شمشیر، آماده‌ی حمله به قلمرو <b>{target_name}</b> شدن.\n\n"
-        f"از آن سو، <b>{target_name}</b> با <b>{lord_count:,}</b> لر و <b>{brick_count:,}</b> آجر آماده‌ی دفاعه.\n\n"
+        f"⚔️ <b>حمله‌کننده:</b> {attacker_link}\n"
+        f"🆔 <code>{attacker_id}</code>\n"
+        f"🔪 تعداد کارگر افغانی: <b>{worker_count:,}</b>\n\n"
+        f"🛡️ <b>مدافع:</b> {target_link}\n"
+        f"🆔 <code>{target_id}</code>\n"
+        f"🛡️ تعداد لر: <b>{lord_count:,}</b>\n"
+        f"🧱 تعداد آجر: <b>{brick_count:,}</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"در دشتی پهناور، سپاه {attacker_link} آماده‌ی نبرد شد.\n"
+        f"<b>{worker_count:,}</b> کارگر افغانی با نیزه و شمشیر، آماده‌ی حمله به قلمرو {target_link} شدن.\n\n"
         f"⏳ <i>کارگرها در حال حرکت به سمت قلمرو دشمن...</i>",
         parse_mode=ParseMode.HTML,
     )
     await asyncio.sleep(4)
 
-    # صحنه ۲
+    # ─── صحنه ۲ ───
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل دوم: راهپیمایی</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🚶 <b>سپاه در حرکته...</b>\n\n"
+        f"🚶 <b>سپاه {attacker_link} در حرکته...</b>\n\n"
         f"کارگرهای افغانی با پای پیاده، از کوه و دشت گذشتن.\n"
         f"گرد و غبار آسمان رو تاریک کرده.\n\n"
-        f"🎯 <b>هدف:</b> قلمرو {target_name}\n"
+        f"🎯 <b>هدف:</b> قلمرو {target_link}\n"
         f"📍 <b>فاصله:</b> ۱۰ کیلومتر\n\n"
         f"⏳ <i>اولین گروه پیشقراولان دارن نزدیک می‌شن...</i>",
         parse_mode=ParseMode.HTML,
     )
     await asyncio.sleep(4)
 
-    # صحنه ۳
+    # ─── صحنه ۳ ───
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل سوم: دیده‌بانی</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"👁️ <b>دیده‌بانان {target_name} سپاه رو دیدن!</b>\n\n"
+        f"👁️ <b>دیده‌بانان {target_link} سپاه رو دیدن!</b>\n\n"
         f"🛡️ <b>{lord_count:,} لر</b> با عجله به سنگرها رفتن.\n"
         f"🧱 <b>{brick_count:,} آجر</b> برای پرتاب آماده شد.\n\n"
         f"📯 <i>شیپور جنگ زده شد!</i>\n"
-        f"🏰 قلعه‌ی {target_name} در حالت آماده‌باش قرار گرفت.\n\n"
+        f"🏰 قلعه‌ی {target_link} در حالت آماده‌باش قرار گرفت.\n\n"
         f"⏳ <i>لحظه‌ی رویارویی نزدیکه...</i>",
         parse_mode=ParseMode.HTML,
     )
     await asyncio.sleep(4)
 
-    # صحنه ۴
+    # ─── صحنه ۴ ───
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل چهارم: نبرد آغاز شد!</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"⚔️ <b>اولین برخورد!</b>\n\n"
+        f"⚔️ <b>رویارویی {attacker_link} و {target_link}!</b>\n\n"
         f"💥 کارگرهای افغانی به دیوارهای قلعه رسیدن!\n\n"
-        f"🛡️ لرها شروع کردن به پرت کردن آجر...\n"
-        f"🔪 کارگرها فریاد می‌کشن و حمله می‌کنن...\n\n"
+        f"🛡️ لرهای {target_link} شروع کردن به پرت کردن آجر...\n"
+        f"🔪 کارگرهای {attacker_link} فریاد می‌کشن و حمله می‌کنن...\n\n"
         f"⏳ <i>نبرد در جریانه...</i>",
         parse_mode=ParseMode.HTML,
     )
     await asyncio.sleep(3)
 
-    # صحنه ۵: کشتار
+    # ─── صحنه ۵: کشتار ───
     if worker_count <= 20:
         step = 1
     elif worker_count <= 50:
@@ -1258,12 +1295,12 @@ async def execute_war(update, context, war: dict) -> None:
             f"📜 <b>داستان جنگی بزرگ</b>\n"
             f"<i>فصل پنجم: کشتار</i>\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"⚔️ <b>نبرد در جریانه!</b>\n\n"
+            f"⚔️ {attacker_link} vs {target_link}\n\n"
             f"{event}\n\n"
             f"📊 <b>آمار زنده:</b>\n"
-            f"🔪 کارگرهای زنده: <b>{remaining_now:,}</b>\n"
+            f"🔪 کارگرهای {attacker_link}: <b>{remaining_now:,}</b>\n"
             f"💀 کشته‌شده: <b>{killed_so_far:,}</b>\n"
-            f"🛡️ لرهای باقی‌مونده: <b>{max(0, available_lords - (killed_so_far // 5)):,}</b>\n\n"
+            f"🛡️ لرهای {target_link}: <b>{max(0, available_lords - (killed_so_far // 5)):,}</b>\n\n"
             f"[{progress_bar}] {progress*10}%\n\n"
             f"⏳ <i>نبرد ادامه داره...</i>",
             parse_mode=ParseMode.HTML,
@@ -1276,16 +1313,16 @@ async def execute_war(update, context, war: dict) -> None:
         else:
             await asyncio.sleep(0.6)
 
-    # صحنه ۶
+    # ─── صحنه ۶ ───
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل ششم: پایان کشتار</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🩸 <b>میدون جنگ...</b>\n\n"
-        f"💀 <b>{actual_workers_killed:,} کارگر افغانی</b> کشته شدن.\n"
-        f"🛡️ <b>{available_lords:,} لر</b> در دفاع از قلمروشون قربانی شدن.\n"
-        f"🧱 <b>{available_lords:,} آجر</b> در نبرد مصرف شد.\n\n"
-        f"🔪 <b>کارگرهای باقی‌مونده:</b> {remaining_workers:,}\n\n"
+        f"💀 <b>{actual_workers_killed:,} کارگر {attacker_link}</b> کشته شدن.\n"
+        f"🛡️ <b>{available_lords:,} لر {target_link}</b> در دفاع قربانی شدن.\n"
+        f"🧱 <b>{available_lords:,} آجر</b> مصرف شد.\n\n"
+        f"🔪 <b>کارگرهای باقی‌مونده‌ی {attacker_link}:</b> {remaining_workers:,}\n\n"
         f"⏳ <i>در حال محاسبه‌ی نتیجه‌ی نهایی...</i>",
         parse_mode=ParseMode.HTML,
     )
@@ -1316,25 +1353,25 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
-    # صحنه ۷: نتیجه
+    # ─── صحنه ۷: نتیجه ───
     if remaining_workers > 0:
         result = (
             f"📜 <b>داستان جنگی بزرگ</b>\n"
             f"<i>فصل پایانی: پیروزی!</i>\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏆 <b>{attacker_name} پیروز شد!</b>\n\n"
+            f"🏆 <b>{attacker_link} پیروز شد!</b>\n\n"
             f"🎺 شیپور پیروزی نواخته شد.\n"
-            f"کارگرهای باقی‌مونده وارد قلمرو {target_name} شدن و غنائم رو جمع کردن.\n\n"
+            f"کارگرهای باقی‌مونده وارد قلمرو {target_link} شدن و غنائم رو جمع کردن.\n\n"
             f"📊 <b>آمار نبرد:</b>\n"
-            f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
-            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"👤 حمله‌کننده: {attacker_link} (<code>{attacker_id}</code>)\n"
+            f"🎯 هدف: {target_link} (<code>{target_id}</code>)\n\n"
             f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
             f"💀 کارگرهای کشته‌شده: <b>{actual_workers_killed:,}</b>\n"
             f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>\n\n"
-            f"🛡️ لرهای قربانی‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
+            f"🛡️ لرهای قربانی‌شده‌ی {target_link}: <b>{available_lords:,}</b>\n"
             f"🧱 آجرهای مصرف‌شده: <b>{available_lords:,}</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"🎁 <b>غنائم جنگی:</b>\n"
+            f"🎁 <b>غنائم جنگی {attacker_link}:</b>\n"
             f"🥩 گوشت: <b>+{stolen_meat:,}</b>\n"
             f"🍵 چای: <b>+{stolen_tea:,}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━"
@@ -1344,17 +1381,17 @@ async def execute_war(update, context, war: dict) -> None:
             f"📜 <b>داستان جنگی بزرگ</b>\n"
             f"<i>فصل پایانی: شکست!</i>\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"💥 <b>حمله شکست خورد!</b>\n\n"
+            f"💥 <b>حمله‌ی {attacker_link} شکست خورد!</b>\n\n"
             f"🩸 همه‌ی کارگرهای افغانی قربانی شدن.\n"
-            f"قلمرو <b>{target_name}</b> از حمله دفاع کرد.\n\n"
+            f"قلمرو {target_link} از حمله دفاع کرد.\n\n"
             f"📊 <b>آمار نبرد:</b>\n"
-            f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
-            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"👤 حمله‌کننده: {attacker_link} (<code>{attacker_id}</code>)\n"
+            f"🎯 هدف: {target_link} (<code>{target_id}</code>)\n\n"
             f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
             f"💀 <b>همه‌ی کارگرها کشته شدن!</b> 🪦\n\n"
-            f"🛡️ لرهای دفاعی هدف: <b>{available_lords:,}</b>\n"
-            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n\n"
-            f"🏆 برنده: <b>{target_name}</b>\n"
+            f"🛡️ لرهای دفاعی {target_link}: <b>{available_lords:,}</b>\n"
+            f"🧱 آجرهای مصرف‌شده: <b>{available_lords:,}</b>\n\n"
+            f"🏆 برنده: {target_link} (<code>{target_id}</code>)\n"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
 
@@ -1370,8 +1407,8 @@ async def execute_war(update, context, war: dict) -> None:
         await notify_admins(
             context,
             f"⚔️ <b>حمله جدید!</b>\n\n"
-            f"👤 حمله‌کننده: <b>{attacker_name}</b> (<code>{attacker_id}</code>)\n"
-            f"🎯 هدف: <b>{target_name}</b> (<code>{target_id}</code>)\n"
+            f"👤 حمله‌کننده: {attacker_link} (<code>{attacker_id}</code>)\n"
+            f"🎯 هدف: {target_link} (<code>{target_id}</code>)\n"
             f"🔪 کارگرها: <b>{worker_count:,}</b>\n"
             f"💀 کشته‌شده: <b>{actual_workers_killed:,}</b>\n"
             f"🎁 غنیمت: <b>+{stolen_meat:,} گوشت</b>، <b>+{stolen_tea:,} چای</b>",
@@ -1381,7 +1418,7 @@ async def execute_war(update, context, war: dict) -> None:
 
 
 # ═════════════════════════════════════════════
-# راهنما، پروفایل، برترها، منابع
+# راهنما، پروفایل، برترها
 # ═════════════════════════════════════════════
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
@@ -1488,8 +1525,8 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     medals = ["🥇", "🥈", "🥉"] + ["🎖️"] * 7
     lines = ["🏆 <b>۱۰ نفر برتر شومپد</b>\n"]
     for i, u in enumerate(top_users):
-        name = u.first_name or u.username or f"کاربر {u.telegram_id}"
-        lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
+        link = get_user_link(u, u.telegram_id)
+        lines.append(f"{medals[i]} {link} — {u.pads:,} پد")
 
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
@@ -1601,7 +1638,7 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if target_user.meat <= 0 or target_user.tea <= 0:
         await update.message.reply_text(
             f"❌ <b>حمله لغو شد!</b>\n\n"
-            f"🎯 حریف: <b>{target_user.first_name or 'کاربر'}</b>\n\n"
+            f"🎯 حریف: {get_user_link(target_user, target_user.telegram_id)}\n\n"
             f"⚠️ این کاربر گوشت و چای نداره!\n"
             f"🥩 گوشت: <b>{target_user.meat:,}</b>\n"
             f"🍵 چای: <b>{target_user.tea:,}</b>",
@@ -1609,7 +1646,8 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    target_name = target_user.first_name or target_user.username or "کاربر"
+    attacker_link = get_user_link(attacker, user.id)
+    target_link = get_user_link(target_user, target_user.telegram_id)
 
     keyboard = [[
         InlineKeyboardButton(
@@ -1622,8 +1660,8 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(
         f"⚔️ <b>درخواست حمله</b>\n\n"
-        f"👤 حمله‌کننده: <b>{attacker.first_name}</b>\n"
-        f"🎯 هدف: <b>{target_name}</b>\n\n"
+        f"👤 حمله‌کننده: {attacker_link} (<code>{user.id}</code>)\n"
+        f"🎯 هدف: {target_link} (<code>{target_user.telegram_id}</code>)\n\n"
         f"🔪 کارگرهای افغانی تو: <b>{attacker.workers:,}</b>\n"
         f"🛡️ لرهای حریف: <b>{target_user.lords:,}</b>\n"
         f"🧱 آجرهای حریف: <b>{target_user.bricks:,}</b>\n\n"
@@ -1691,9 +1729,9 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
     success = await transfer_shields(user.id, target_user.telegram_id, amount)
 
     if success:
-        target_name = target_user.first_name or target_user.username or "کاربر"
+        target_link = get_user_link(target_user, target_user.telegram_id)
         await update.message.reply_text(
-            f"🎁 <b>{amount:,} سیفید</b> به <b>{target_name}</b> پرت کردی!",
+            f"🎁 <b>{amount:,} سیفید</b> به {target_link} پرت کردی!",
             parse_mode=ParseMode.HTML,
         )
 
@@ -1790,10 +1828,10 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     await update_resources(target_user.telegram_id, **{column: receiver_new})
 
-    target_name = target_user.first_name or target_user.username or "کاربر"
+    target_link = get_user_link(target_user, target_user.telegram_id)
 
     await update.message.reply_text(
-        f"✅ <b>{amount:,} {resource_name}</b> به <b>{target_name}</b> منتقل شد!\n\n"
+        f"✅ <b>{amount:,} {resource_name}</b> به {target_link} منتقل شد!\n\n"
         f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
         f"♾️ موجودی تو: <b>بی‌نهایت</b>",
         parse_mode=ParseMode.HTML,
@@ -1815,17 +1853,9 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     try:
         await log_report(
             event_type="admin_transfer",
-            description=f"انتقال {amount:,} {resource_name} به {target_name}",
+            description=f"انتقال {amount:,} {resource_name} به {target_user.telegram_id}",
             user_id=user.id,
             target_id=target_user.telegram_id,
-        )
-        await notify_admins(
-            context,
-            f"📤 <b>انتقال مدیر</b>\n\n"
-            f"👤 از: <b>{user.first_name}</b>\n"
-            f"🎯 به: <b>{target_name}</b> (<code>{target_user.telegram_id}</code>)\n"
-            f"📦 منبع: <b>{resource_name}</b>\n"
-            f"💎 مقدار: <b>{amount:,}</b>",
         )
     except Exception as exc:
         logger.exception("log admin_transfer error: %s", exc)
@@ -1917,10 +1947,10 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
 
     await update_resources(target_user.telegram_id, **{column: receiver_new})
 
-    target_name = target_user.first_name or target_user.username or "کاربر"
+    target_link = get_user_link(target_user, target_user.telegram_id)
 
     await update.message.reply_text(
-        f"✅ <b>{amount:,} {resource_name}</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
+        f"✅ <b>{amount:,} {resource_name}</b> از {target_link} پس گرفته شد!\n\n"
         f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>",
         parse_mode=ParseMode.HTML,
     )
@@ -1937,23 +1967,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
     except Exception as exc:
         logger.exception("send_message error: %s", exc)
-
-    try:
-        await log_report(
-            event_type="admin_remove_transfer",
-            description=f"پس گرفتن {amount:,} {resource_name} از {target_name}",
-            user_id=user.id,
-            target_id=target_user.telegram_id,
-        )
-        await notify_admins(
-            context,
-            f"📥 <b>پس گرفتن مدیر</b>\n\n"
-            f"👤 از: <b>{target_name}</b> (<code>{target_user.telegram_id}</code>)\n"
-            f"📦 منبع: <b>{resource_name}</b>\n"
-            f"💎 مقدار: <b>{amount:,}</b>",
-        )
-    except Exception as exc:
-        logger.exception("log admin_remove error: %s", exc)
 
 
 # ═════════════════════════════════════════════
@@ -2004,17 +2017,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await process_buy_amount(update, context, int(text))
         return
 
-    # راهنما
     if text == CMD_HELP:
         await help_handler(update, context)
         return
 
-    # پروفایل
     if text == CMD_PROFILE or text.startswith("پروفایل "):
         await profile_handler(update, context)
         return
 
-    # فروشگاه (🆕)
     if text in ("فروشگاه", "فروشگاه شومپد", "شومپد فروشگاه"):
         await shop_handler(update, context)
         return
