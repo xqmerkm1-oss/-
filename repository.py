@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import desc, select
 
@@ -7,46 +7,37 @@ from models import User
 
 COOLDOWN_SECONDS = 180
 
+# 🎯 خوراک روزانه
+WORKER_FOOD_MEAT = 1       # هر کارگر ۱ گوشت/روز
+LORD_FOOD_CAKE = 3         # هر لر ۳ کیک یزدی/روز
+HUNGRY_DAYS_LIMIT = 7      # ۷ روز گرسنگی → مرگ همه جنگجوها
+
 
 # 🎯 نقشه‌ی اسم منبع به ستون دیتابیس
 RESOURCE_MAP = {
-    # پد
     "پد": "pads",
     "پدها": "pads",
-    # گوشت
     "گوشت": "meat",
-    # چای
     "چای": "tea",
-    # آجر
     "آجر": "bricks",
     "اجر": "bricks",
-    # نون بربری
     "نون بربری": "bread_count",
     "نون": "bread_count",
-    # کیک یزدی
     "کیک یزدی": "cake",
     "کیک": "cake",
-    # سیفید
     "سیفید": "shields",
-    # کارگر افغانی (همه حالت‌ها)
     "کارگر افغانی": "workers",
     "کارگرافغانی": "workers",
     "افغانی": "workers",
     "کارگر": "workers",
-    # لر
     "لر": "lords",
     "لرها": "lords",
-    # گل رز
     "گل رز": "pad_rose",
     "گلرز": "pad_rose",
-    # دختر خوب
     "دختر خوب": "pad_girl",
     "دخترخوب": "pad_girl",
-    # پسر خوب
     "پسر خوب": "pad_boy",
     "پسرخوب": "pad_boy",
-    # شمع
-    "شمع": "pad_candle",
 }
 
 
@@ -70,6 +61,7 @@ async def get_or_create_user(
             username=username,
             first_name=first_name,
             invited_by=invited_by,
+            last_fed_at=datetime.now(timezone.utc),
         )
         session.add(user)
         await session.commit()
@@ -78,7 +70,6 @@ async def get_or_create_user(
 
 
 async def get_or_create_user_by_id(telegram_id: int) -> tuple[User | None, bool]:
-    """کاربر رو با آی‌دی عددی می‌گیره یا می‌سازه."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -88,7 +79,10 @@ async def get_or_create_user_by_id(telegram_id: int) -> tuple[User | None, bool]
         if user is not None:
             return user, False
 
-        user = User(telegram_id=telegram_id)
+        user = User(
+            telegram_id=telegram_id,
+            last_fed_at=datetime.now(timezone.utc),
+        )
         session.add(user)
         await session.commit()
         await session.refresh(user)
@@ -188,6 +182,8 @@ async def update_resources(
     pad_girl: int | None = None,
     pad_boy: int | None = None,
     pad_candle: int | None = None,
+    hungry_days: int | None = None,
+    last_fed_at: datetime | None = None,
 ) -> User | None:
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -221,10 +217,106 @@ async def update_resources(
             user.pad_boy = pad_boy
         if pad_candle is not None:
             user.pad_candle = pad_candle
+        if hungry_days is not None:
+            user.hungry_days = hungry_days
+        if last_fed_at is not None:
+            user.last_fed_at = last_fed_at
 
         await session.commit()
         await session.refresh(user)
         return user
+
+
+async def process_daily_food(telegram_id: int) -> dict:
+    """مصرف روزانه رو حساب می‌کنه.
+    
+    برمی‌گردونه:
+    {
+        "processed": bool,
+        "days": int,
+        "meat_needed": int,
+        "cake_needed": int,
+        "starved": bool,
+        "workers_lost": int,
+        "lords_lost": int,
+    }
+    """
+    result_data = {
+        "processed": False,
+        "days": 0,
+        "meat_needed": 0,
+        "cake_needed": 0,
+        "starved": False,
+        "workers_lost": 0,
+        "lords_lost": 0,
+    }
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return result_data
+
+        # اگه جنگجو نداره، کاری نکن
+        if user.workers <= 0 and user.lords <= 0:
+            user.last_fed_at = datetime.now(timezone.utc)
+            user.hungry_days = 0
+            await session.commit()
+            return result_data
+
+        now = datetime.now(timezone.utc)
+        last_fed = user.last_fed_at
+
+        if last_fed is None:
+            user.last_fed_at = now
+            await session.commit()
+            return result_data
+
+        # اگه تایم‌زون نداره، اضافه کن
+        if last_fed.tzinfo is None:
+            last_fed = last_fed.replace(tzinfo=timezone.utc)
+
+        elapsed = now - last_fed
+        days_passed = int(elapsed.total_seconds() // 86400)
+
+        if days_passed < 1:
+            return result_data
+
+        result_data["processed"] = True
+        result_data["days"] = days_passed
+
+        for _ in range(days_passed):
+            # چک کن کاربر چقدر خوراک لازم داره
+            meat_needed = user.workers * WORKER_FOOD_MEAT
+            cake_needed = user.lords * LORD_FOOD_CAKE
+
+            result_data["meat_needed"] = meat_needed
+            result_data["cake_needed"] = cake_needed
+
+            if user.meat >= meat_needed and user.cake >= cake_needed:
+                # همه چی خوبه
+                user.meat -= meat_needed
+                user.cake -= cake_needed
+                user.hungry_days = 0
+            else:
+                # گرسنگی
+                user.hungry_days += 1
+
+                if user.hungry_days >= HUNGRY_DAYS_LIMIT:
+                    # همه‌ی جنگجوها می‌میرن
+                    result_data["starved"] = True
+                    result_data["workers_lost"] = user.workers
+                    result_data["lords_lost"] = user.lords
+                    user.workers = 0
+                    user.lords = 0
+                    user.hungry_days = 0
+                    break
+
+        user.last_fed_at = now
+        await session.commit()
+        return result_data
 
 
 async def transfer_shields(from_id: int, to_id: int, amount: int) -> bool:
