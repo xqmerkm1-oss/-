@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -699,9 +700,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ═════════════════════════════════════════════
-# اجرای جنگ (نمایش لحظه‌ای)
+# اجرای جنگ (نمایش طولانی)
 # ═════════════════════════════════════════════
 async def execute_war(update, context, war: dict) -> None:
+    """جنگ رو با نمایش طولانی اجرا می‌کنه."""
     query = update.callback_query
 
     attacker_id = war["attacker_id"]
@@ -723,6 +725,8 @@ async def execute_war(update, context, war: dict) -> None:
     target_name = target.first_name or "کاربر"
 
     worker_count = attacker.workers
+    lord_count = target.lords
+    brick_count = target.bricks
 
     if worker_count < 1:
         await query.edit_message_text("❌ کارگر افغانی نداری!", reply_markup=back_keyboard())
@@ -733,62 +737,67 @@ async def execute_war(update, context, war: dict) -> None:
         f"⚔️ <b>جنگ شروع شد!</b>\n\n"
         f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
         f"🎯 هدف: <b>{target_name}</b>\n\n"
-        f"🛡️ لرهای مدافع: <b>{target.lords:,}</b>\n"
-        f"🧱 آجرهای مدافع: <b>{target.bricks:,}</b>\n\n"
-        f"⏳ در حال نبرد...",
+        f"🛡️ <b>{target_name}</b> با <b>{lord_count:,}</b> لر دفاع می‌کنه!\n\n"
+        f"🎺 شیپور جنگ زده شد...\n"
+        f"⏳ کارگرها دارن حرکت می‌کنن...",
         parse_mode=ParseMode.HTML,
     )
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
 
-    # ─── مرحله ۲: رسیدن کارگرها ───
+    # ─── مرحله ۲: حرکت ───
     await query.edit_message_text(
         f"⚔️ <b>جنگ در جریانه!</b>\n\n"
-        f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
-        f"🎯 هدف: <b>{target_name}</b>\n\n"
-        f"🔪 کارگرهای افغانی دارن می‌رسن...\n"
-        f"🛡️ <b>{target.lords:,} لر</b> آماده‌ی دفاع شدن!\n\n"
+        f"👤 <b>{attacker_name}</b>: <b>{worker_count:,}</b> کارگر افغانی 🔪\n"
+        f"🎯 <b>{target_name}</b>: <b>{lord_count:,}</b> لر 🛡️\n\n"
+        f"🚶 کارگرهای افغانی دارن به سمت حریف می‌رن...\n"
+        f"🏹 لرها آماده‌ی پرت کردن آجرن...\n\n"
+        f"⏳ در حال نزدیک شدن...",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(3)
+
+    # ─── مرحله ۳: نبرد ───
+    await query.edit_message_text(
+        f"⚔️ <b>نبرد شروع شد!</b>\n\n"
+        f"💥 کارگرهای افغانی به لرها رسیدن!\n\n"
+        f"🛡️ <b>{lord_count:,} لر</b> دارن آجر پرت می‌کنن!\n"
+        f"🔪 <b>{worker_count:,} کارگر</b> دارن حمله می‌کنن!\n\n"
         f"⏳ در حال نبرد...",
         parse_mode=ParseMode.HTML,
     )
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
 
     # ─── محاسبه نتیجه ───
-    available_lords = min(target.lords, target.bricks)
-    workers_killed = available_lords * 4
+    # قانون: هر لر = ۵ کارگر می‌کشه + ۱ آجر مصرف می‌کنه
+    available_lords = min(lord_count, brick_count)
+    workers_killed = available_lords * 5
     remaining_workers = max(0, worker_count - workers_killed)
 
-    if available_lords == 0:
-        remaining_workers = worker_count
-        attacker_new_workers = attacker.workers
-    else:
+    if available_lords > 0:
         attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
         if attacker_new_workers < 0:
             attacker_new_workers = 0
+    else:
+        remaining_workers = worker_count
+        attacker_new_workers = attacker.workers
 
+    # ─── مرحله ۴: کشتار ───
+    await query.edit_message_text(
+        f"⚔️ <b>کشتار!</b>\n\n"
+        f"🛡️ <b>{available_lords:,} لر</b> آجر پرت کردن!\n"
+        f"💀 <b>{worker_count - remaining_workers:,} کارگر افغانی</b> کشته شدن!\n"
+        f"🧱 <b>{available_lords:,} آجر</b> مصرف شد!\n\n"
+        f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>\n\n"
+        f"⏳ در حال محاسبه‌ی نتیجه‌ی نهایی...",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(3)
+
+    # ─── محاسبه دزدی ───
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
     stolen_tea = min(stolen_tea, target.tea)
     stolen_meat = min(stolen_meat, target.meat)
-
-    # ─── مرحله ۳: نمایش دفاع ───
-    battle_lines = [
-        f"⚔️ <b>نبرد در جریان!</b>\n",
-        f"👤 حمله‌کننده: <b>{attacker_name}</b>",
-        f"🎯 هدف: <b>{target_name}</b>\n",
-    ]
-
-    if available_lords > 0:
-        battle_lines.append(f"🛡️ <b>{available_lords:,} لر</b> از {target_name} دفاع کردن!")
-        battle_lines.append(f"💀 <b>{worker_count - remaining_workers:,} کارگر</b> کشته شدن!")
-        battle_lines.append(f"🧱 <b>{available_lords:,} آجر</b> مصرف شد!\n")
-    else:
-        battle_lines.append(f"⚠️ {target_name} هیچ لر یا آجری برای دفاع نداشت!\n")
-
-    battle_lines.append(f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>")
-    battle_lines.append(f"⏳ در حال محاسبه‌ی نتیجه...")
-
-    await query.edit_message_text("\n".join(battle_lines), parse_mode=ParseMode.HTML)
-    await asyncio.sleep(2)
 
     # ─── به‌روزرسانی دیتابیس ───
     await update_resources(
@@ -806,7 +815,7 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
-    # ─── مرحله ۴: نتیجه نهایی ───
+    # ─── مرحله ۵: نتیجه ───
     if remaining_workers > 0:
         result = (
             f"🎉 <b>جنگ تموم شد!</b>\n"
@@ -831,9 +840,10 @@ async def execute_war(update, context, war: dict) -> None:
             f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
             f"🎯 هدف: <b>{target_name}</b>\n\n"
             f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
-            f"💀 همه‌ی کارگرها کشته شدن! 🪦\n\n"
+            f"💀 <b>همه‌ی کارگرها کشته شدن!</b> 🪦\n\n"
             f"🛡️ لرهای دفاعی هدف: <b>{available_lords:,}</b>\n"
-            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
+            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n\n"
+            f"🏆 برنده: <b>{target_name}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
 
@@ -841,7 +851,7 @@ async def execute_war(update, context, war: dict) -> None:
 
 
 # ═════════════════════════════════════════════
-# دستورات متنی
+# راهنما، پروفایل، برترها، منابع
 # ═════════════════════════════════════════════
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
@@ -923,16 +933,10 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 # ═════════════════════════════════════════════
-# حمله با ریپلای
+# حمله
 # ═════════════════════════════════════════════
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حمله.
-    
-    روش‌ها:
-    - حمله (با ریپلای)
-    - حمله @user (با ریپلای)
-    - حمله 123456789 (با ریپلای)
-    """
+    """حمله — روش‌های مختلف."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -955,13 +959,19 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # ─── پیدا کردن حریف ───
     target_user = None
 
-    # ۱. ریپلای روی پیام کاربر
+    # ۱. ریپلای
     if update.message.reply_to_message is not None:
         replied = update.message.reply_to_message
+
         if replied.from_user is not None and not replied.from_user.is_bot:
             target_user = await get_user_by_id(replied.from_user.id)
 
-    # ۲. اگه ریپلای نبود، توی متن بگرد
+        if target_user is None and replied.text:
+            replied_text = replied.text.strip()
+            if replied_text.lstrip("-").isdigit():
+                target_user, _ = await get_or_create_user_by_id(int(replied_text))
+
+    # ۲. متن
     if target_user is None:
         parts = text.split()
         for part in parts[1:]:
@@ -969,9 +979,9 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 target_user = await get_user_by_username(part)
                 if target_user is not None:
                     break
-            elif part.lstrip("-").isdigit() and len(part) > 5:
+            elif part.lstrip("-").isdigit() and len(part.lstrip("-")) >= 6:
                 try:
-                    target_user = await get_user_by_id(int(part))
+                    target_user, _ = await get_or_create_user_by_id(int(part))
                     if target_user is not None:
                         break
                 except Exception:
@@ -982,8 +992,8 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "❌ حریف پیدا نشد!\n\n"
             "📋 روش‌های درست:\n"
             "1️⃣ روی پیام کاربر <b>ریپلای</b> کن و بنویس <code>حمله</code>\n"
-            "2️⃣ یا <code>حمله @user</code> با ریپلای\n"
-            "3️⃣ یا <code>حمله 123456789</code> با ریپلای",
+            "2️⃣ <code>حمله @username</code>\n"
+            "3️⃣ <code>حمله 123456789</code> (آی‌دی عددی)",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -994,9 +1004,12 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     target_name = target_user.first_name or target_user.username or "کاربر"
 
-    # ─── پیام درخواست حمله ───
     keyboard = [[
-        InlineKeyboardButton("📝 ثبت درخواست حمله", callback_data=f"war_request_{target_user.telegram_id}", style="danger"),
+        InlineKeyboardButton(
+            "📝 ثبت درخواست حمله",
+            callback_data=f"war_request_{target_user.telegram_id}",
+            style="danger",
+        ),
         InlineKeyboardButton("❌ لغو", callback_data="war_cancel", style="success"),
     ]]
 
@@ -1082,13 +1095,7 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 # انتقال توسط سازنده‌ها
 # ═════════════════════════════════════════════
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال منابع توسط سازنده‌ها.
-    
-    فرمت‌ها:
-    - انتقال پد 1000 1844792522
-    - انتقال پد 1000 @ali
-    - انتقال پد 1000  (با ریپلای)
-    """
+    """انتقال منابع توسط سازنده‌ها."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1115,7 +1122,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     amount = None
     target_offset = None
 
-    # منابع دو کلمه‌ای
     two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
     two_word_found = False
 
@@ -1132,7 +1138,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
                     pass
                 break
 
-    # منابع تک کلمه‌ای
     if not two_word_found and len(parts) >= 3:
         resource_name = parts[1]
         try:
@@ -1168,7 +1173,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     # ─── پیدا کردن هدف ───
     target_user = None
 
-    # ۱. ریپلای
     if update.message.reply_to_message is not None:
         replied = update.message.reply_to_message
         if replied.from_user is not None and not replied.from_user.is_bot:
@@ -1176,7 +1180,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         elif replied.text and replied.text.strip().isdigit():
             target_user, _ = await get_or_create_user_by_id(int(replied.text.strip()))
 
-    # ۲. متن
     if target_user is None and len(parts) > target_offset:
         target_str = parts[target_offset]
         if target_str.startswith("@"):
@@ -1190,12 +1193,11 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             "📋 روش‌های درست:\n"
             "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
             "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
-            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر",
+            "3️⃣ <code>انتقال پد 1000</code> + ریپلای",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    # ─── انتقال ───
     column = RESOURCE_MAP[resource_name]
     receiver_current = getattr(target_user, column)
     receiver_new = receiver_current + amount
@@ -1245,7 +1247,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    # ─── پیدا کردن منبع ───
     resource_name = None
     amount = None
     target_offset = None
@@ -1286,7 +1287,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    # ─── پیدا کردن هدف ───
     target_user = None
 
     if update.message.reply_to_message is not None:
@@ -1370,7 +1370,7 @@ async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ═════════════════════════════════════════════
-# هندلر اصلی متن
+# هندلر اصلی
 # ═════════════════════════════════════════════
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
@@ -1387,7 +1387,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await process_buy_amount(update, context, int(text))
         return
 
-    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
