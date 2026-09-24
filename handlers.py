@@ -22,7 +22,10 @@ from messages import (
     START_TEXT,
 )
 from repository import (
+    HUNGRY_DAYS_LIMIT,
+    LORD_FOOD_CAKE,
     RESOURCE_MAP,
+    WORKER_FOOD_MEAT,
     add_pads,
     get_or_create_user,
     get_or_create_user_by_id,
@@ -32,6 +35,7 @@ from repository import (
     give_reward,
     increment_invite_count,
     mark_bread_used,
+    process_daily_food,
     seconds_remaining,
     set_user_pads,
     transfer_resource,
@@ -49,7 +53,6 @@ BOT_USERNAME = "Schompedbot"
 INVITER_REWARD = 500
 INVITED_REWARD = 250
 
-# 🎯 سازنده‌های ربات
 ADMIN_IDS = [7803165903, 1844792522]
 
 TEHRAN_TZ = ZoneInfo("Asia/Tehran")
@@ -129,6 +132,15 @@ def format_user_profile(db_user, remaining: int) -> str:
     username = f"@{db_user.username}" if db_user.username else "ندارد"
     name = db_user.first_name or "دوست عزیز"
 
+    # 🆕 وضعیت گرسنگی
+    hungry_status = ""
+    if db_user.hungry_days > 0:
+        remaining_days = HUNGRY_DAYS_LIMIT - db_user.hungry_days
+        hungry_status = (
+            f"\n⚠️ <b>گرسنگی:</b> {db_user.hungry_days}/{HUNGRY_DAYS_LIMIT} روز\n"
+            f"💀 {remaining_days} روز دیگه تا مرگ جنگجوها!\n"
+        )
+
     return (
         f"👤 <b>پروفایل {name}</b>\n\n"
         f"📛 نام: <b>{name}</b>\n"
@@ -147,12 +159,45 @@ def format_user_profile(db_user, remaining: int) -> str:
         f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n\n"
         f"⚔️ <b>جنگجوها:</b>\n"
         f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
-        f"🛡️ لر: <b>{db_user.lords:,}</b>\n\n"
+        f"🛡️ لر: <b>{db_user.lords:,}</b>\n"
+        f"{hungry_status}\n"
         f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
         f"⏳ وضعیت جایزه: {cooldown}\n\n"
         f"📅 تاریخ: <b>{date_str}</b>\n"
         f"🕐 ساعت: <b>{time_str}</b> (تهران)"
     )
+
+
+async def check_daily_food(telegram_id: int, update: Update) -> None:
+    """مصرف روزانه رو چک می‌کنه و اگه لازم بود پیام می‌ده."""
+    try:
+        result = await process_daily_food(telegram_id)
+    except Exception as exc:
+        logger.exception("process_daily_food error: %s", exc)
+        return
+
+    if not result["processed"]:
+        return
+
+    if update.message is None:
+        return
+
+    if result["starved"]:
+        await update.message.reply_text(
+            f"💀 <b>جنگجوهای تو از گرسنگی مردن!</b>\n\n"
+            f"📅 {HUNGRY_DAYS_LIMIT} روز گرسنه موندن و نتونستن خوراکشون رو بدن.\n\n"
+            f"🔪 کارگرهای افغانی از دست رفته: <b>{result['workers_lost']:,}</b>\n"
+            f"🛡️ لرهای از دست رفته: <b>{result['lords_lost']:,}</b>",
+            parse_mode=ParseMode.HTML,
+        )
+    elif result["days"] > 1:
+        await update.message.reply_text(
+            f"🍽️ <b>مصرف روزانه</b>\n\n"
+            f"📅 {result['days']} روز گذشته.\n"
+            f"🥩 گوشت مصرف‌شده: <b>{result['meat_needed']:,}</b>\n"
+            f"🍰 کیک یزدی مصرف‌شده: <b>{result['cake_needed']:,}</b>",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 # ═════════════════════════════════════════════
@@ -194,8 +239,7 @@ async def process_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
             f"❌ <b>موجودی کافی نداری!</b>\n\n"
             f"🛒 تعداد درخواستی: <b>{amount:,}</b>\n"
             f"💰 هزینه کل: <b>{total_price:,} {price_name}</b>\n"
-            f"💼 موجودی تو: <b>{user_balance:,} {price_name}</b>\n\n"
-            f"📉 <b>{total_price - user_balance:,} {price_name}</b> دیگه لازم داری.",
+            f"💼 موجودی تو: <b>{user_balance:,} {price_name}</b>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -368,7 +412,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
-    # ─── بازگشت ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -385,7 +428,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
-    # ─── راهنما ───
     if data == "help_short":
         await query.edit_message_text(
             HELP_SHORT_TEXT,
@@ -417,6 +459,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if data == "menu_profile":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+            await check_daily_food(user.id, update)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
@@ -424,7 +467,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         remaining = seconds_remaining(db_user)
         text = format_user_profile(db_user, remaining)
-
         await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
@@ -432,6 +474,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if data == "menu_shop":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+            await check_daily_food(user.id, update)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
             await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
@@ -502,7 +545,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── تایید خرید ───
     if data == "confirm_buy":
         buying = context.user_data.get("buying")
         if buying is None or "amount" not in buying:
@@ -525,9 +567,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if user_balance < total_price:
             context.user_data.pop("buying", None)
             await query.edit_message_text(
-                f"❌ <b>موجودی کافی نداری!</b>\n\n"
-                f"💰 هزینه کل: <b>{total_price:,}</b>\n"
-                f"💼 موجودی تو: <b>{user_balance:,}</b>",
+                f"❌ <b>موجودی کافی نداری!</b>",
                 parse_mode=ParseMode.HTML,
             )
             return
@@ -569,7 +609,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             msg = "❌ خطا"
 
         context.user_data.pop("buying", None)
-
         await query.edit_message_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
@@ -602,9 +641,18 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("❌ حریف پیدا نشد!", show_alert=True)
             return
 
+        # 🆕 چک گوشت و چای حریف
+        if target_user.meat <= 0 or target_user.tea <= 0:
+            await query.answer(
+                f"❌ این کاربر گوشت و چای نداره!\n"
+                f"🥩 گوشت: {target_user.meat:,}\n"
+                f"🍵 چای: {target_user.tea:,}",
+                show_alert=True,
+            )
+            return
+
         target_name = target_user.first_name or target_user.username or "کاربر"
 
-        # ذخیره توی context
         context.user_data["war"] = {
             "attacker_id": user.id,
             "target_id": target_id,
@@ -622,20 +670,17 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"🔪 کارگرهای افغانی حمله‌کننده: <b>{attacker.workers:,}</b>\n"
             f"🛡️ لرهای هدف: <b>{target_user.lords:,}</b>\n"
             f"🧱 آجرهای هدف: <b>{target_user.bricks:,}</b>\n\n"
-            f"⚠️ آیا از حمله مطمئنی؟\n"
-            f"با تایید، جنگ شروع می‌شه.",
+            f"⚠️ آیا از حمله مطمئنی؟",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
         return
 
-    # ─── لغو حمله ───
     if data == "war_cancel":
         context.user_data.pop("war", None)
         await query.edit_message_text("❌ حمله لغو شد.", reply_markup=back_keyboard())
         return
 
-    # ─── تایید و اجرای جنگ ───
     if data == "war_confirm":
         war = context.user_data.get("war")
         if war is None:
@@ -700,10 +745,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ═════════════════════════════════════════════
-# اجرای جنگ (نمایش طولانی)
+# اجرای جنگ
 # ═════════════════════════════════════════════
 async def execute_war(update, context, war: dict) -> None:
-    """جنگ رو با نمایش طولانی اجرا می‌کنه."""
     query = update.callback_query
 
     attacker_id = war["attacker_id"]
@@ -721,6 +765,20 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text("❌ کاربر پیدا نشد", reply_markup=back_keyboard())
         return
 
+    # 🆕 چک گوشت و چای حریف (دوباره، چون ممکنه توی این فاصله عوض شده باشه)
+    if target.meat <= 0 or target.tea <= 0:
+        await query.edit_message_text(
+            f"❌ <b>حمله لغو شد!</b>\n\n"
+            f"🎯 حریف: <b>{target.first_name or 'کاربر'}</b>\n\n"
+            f"⚠️ این کاربر گوشت و چای نداره!\n"
+            f"🥩 گوشت: <b>{target.meat:,}</b>\n"
+            f"🍵 چای: <b>{target.tea:,}</b>\n\n"
+            f"💡 حمله به کسی که چیزی برای دزدیدن نداره، فایده‌ای نداره.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
     attacker_name = attacker.first_name or "کاربر"
     target_name = target.first_name or "کاربر"
 
@@ -732,7 +790,7 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text("❌ کارگر افغانی نداری!", reply_markup=back_keyboard())
         return
 
-    # ─── مرحله ۱: شروع ───
+    # ─── مرحله ۱ ───
     await query.edit_message_text(
         f"⚔️ <b>جنگ شروع شد!</b>\n\n"
         f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
@@ -744,7 +802,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── مرحله ۲: حرکت ───
+    # ─── مرحله ۲ ───
     await query.edit_message_text(
         f"⚔️ <b>جنگ در جریانه!</b>\n\n"
         f"👤 <b>{attacker_name}</b>: <b>{worker_count:,}</b> کارگر افغانی 🔪\n"
@@ -756,7 +814,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── مرحله ۳: نبرد ───
+    # ─── مرحله ۳ ───
     await query.edit_message_text(
         f"⚔️ <b>نبرد شروع شد!</b>\n\n"
         f"💥 کارگرهای افغانی به لرها رسیدن!\n\n"
@@ -767,8 +825,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── محاسبه نتیجه ───
-    # قانون: هر لر = ۵ کارگر می‌کشه + ۱ آجر مصرف می‌کنه
+    # ─── محاسبه ───
     available_lords = min(lord_count, brick_count)
     workers_killed = available_lords * 5
     remaining_workers = max(0, worker_count - workers_killed)
@@ -781,7 +838,7 @@ async def execute_war(update, context, war: dict) -> None:
         remaining_workers = worker_count
         attacker_new_workers = attacker.workers
 
-    # ─── مرحله ۴: کشتار ───
+    # ─── مرحله ۴ ───
     await query.edit_message_text(
         f"⚔️ <b>کشتار!</b>\n\n"
         f"🛡️ <b>{available_lords:,} لر</b> آجر پرت کردن!\n"
@@ -793,13 +850,12 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── محاسبه دزدی ───
+    # ─── دزدی ───
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
     stolen_tea = min(stolen_tea, target.tea)
     stolen_meat = min(stolen_meat, target.meat)
 
-    # ─── به‌روزرسانی دیتابیس ───
     await update_resources(
         attacker_id,
         workers=attacker_new_workers,
@@ -815,7 +871,7 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
-    # ─── مرحله ۵: نتیجه ───
+    # ─── نتیجه ───
     if remaining_workers > 0:
         result = (
             f"🎉 <b>جنگ تموم شد!</b>\n"
@@ -871,6 +927,7 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = update.effective_user
     try:
         db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        await check_daily_food(user.id, update)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
@@ -910,9 +967,18 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user = update.effective_user
     try:
         db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        await check_daily_food(user.id, update)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
+
+    hungry_status = ""
+    if db_user.hungry_days > 0:
+        remaining_days = HUNGRY_DAYS_LIMIT - db_user.hungry_days
+        hungry_status = (
+            f"\n\n⚠️ <b>گرسنگی:</b> {db_user.hungry_days}/{HUNGRY_DAYS_LIMIT} روز\n"
+            f"💀 {remaining_days} روز دیگه تا مرگ جنگجوها!"
+        )
 
     await update.message.reply_text(
         f"🎒 <b>منابع تو</b>\n\n"
@@ -927,7 +993,8 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n\n"
         f"⚔️ <b>جنگجوها:</b>\n"
         f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
-        f"🛡️ لر: <b>{db_user.lords:,}</b>",
+        f"🛡️ لر: <b>{db_user.lords:,}</b>"
+        f"{hungry_status}",
         parse_mode=ParseMode.HTML,
     )
 
@@ -936,7 +1003,6 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # حمله
 # ═════════════════════════════════════════════
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حمله — روش‌های مختلف."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -945,6 +1011,7 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        await check_daily_food(user.id, update)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
@@ -959,19 +1026,15 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # ─── پیدا کردن حریف ───
     target_user = None
 
-    # ۱. ریپلای
     if update.message.reply_to_message is not None:
         replied = update.message.reply_to_message
-
         if replied.from_user is not None and not replied.from_user.is_bot:
             target_user = await get_user_by_id(replied.from_user.id)
-
         if target_user is None and replied.text:
             replied_text = replied.text.strip()
             if replied_text.lstrip("-").isdigit():
                 target_user, _ = await get_or_create_user_by_id(int(replied_text))
 
-    # ۲. متن
     if target_user is None:
         parts = text.split()
         for part in parts[1:]:
@@ -993,13 +1056,25 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "📋 روش‌های درست:\n"
             "1️⃣ روی پیام کاربر <b>ریپلای</b> کن و بنویس <code>حمله</code>\n"
             "2️⃣ <code>حمله @username</code>\n"
-            "3️⃣ <code>حمله 123456789</code> (آی‌دی عددی)",
+            "3️⃣ <code>حمله 123456789</code>",
             parse_mode=ParseMode.HTML,
         )
         return
 
     if target_user.telegram_id == user.id:
         await update.message.reply_text("❌ نمی‌تونی به خودت حمله کنی!")
+        return
+
+    # 🆕 چک گوشت و چای حریف
+    if target_user.meat <= 0 or target_user.tea <= 0:
+        await update.message.reply_text(
+            f"❌ <b>حمله لغو شد!</b>\n\n"
+            f"🎯 حریف: <b>{target_user.first_name or 'کاربر'}</b>\n\n"
+            f"⚠️ این کاربر گوشت و چای نداره!\n"
+            f"🥩 گوشت: <b>{target_user.meat:,}</b>\n"
+            f"🍵 چای: <b>{target_user.tea:,}</b>",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     target_name = target_user.first_name or target_user.username or "کاربر"
@@ -1092,10 +1167,9 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ═════════════════════════════════════════════
-# انتقال توسط سازنده‌ها
+# انتقال
 # ═════════════════════════════════════════════
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال منابع توسط سازنده‌ها."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1110,14 +1184,11 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     if len(parts) < 3:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
-            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
-            "یا\n"
-            "<code>انتقال [منبع] [تعداد]</code> + ریپلای",
+            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    # ─── پیدا کردن منبع ───
     resource_name = None
     amount = None
     target_offset = None
@@ -1147,21 +1218,12 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             pass
 
     if resource_name is None or amount is None:
-        await update.message.reply_text(
-            "❌ فرمت اشتباه!\n\n"
-            "📋 مثال:\n"
-            "<code>انتقال پد 1000 1844792522</code>\n"
-            "<code>انتقال پد 1000</code> + ریپلای",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text("❌ فرمت اشتباه!", parse_mode=ParseMode.HTML)
         return
 
     if resource_name not in RESOURCE_MAP:
         await update.message.reply_text(
-            f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
-            f"📋 منابع معتبر:\n"
-            f"<code>پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب</code>",
+            f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1170,7 +1232,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    # ─── پیدا کردن هدف ───
     target_user = None
 
     if update.message.reply_to_message is not None:
@@ -1188,14 +1249,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             target_user, _ = await get_or_create_user_by_id(int(target_str))
 
     if target_user is None:
-        await update.message.reply_text(
-            "❌ کاربر پیدا نشد!\n\n"
-            "📋 روش‌های درست:\n"
-            "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
-            "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
-            "3️⃣ <code>انتقال پد 1000</code> + ریپلای",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text("❌ کاربر پیدا نشد!", parse_mode=ParseMode.HTML)
         return
 
     column = RESOURCE_MAP[resource_name]
@@ -1209,7 +1263,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(
         f"✅ <b>{amount:,} {resource_name}</b> به <b>{target_name}</b> منتقل شد!\n\n"
         f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
-        f"♾️ موجودی تو: <b>بی‌نهایت</b> (دست‌نخورده)",
+        f"♾️ موجودی تو: <b>بی‌نهایت</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -1224,7 +1278,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode=ParseMode.HTML,
         )
     except Exception as exc:
-        logger.exception("send_message to receiver error: %s", exc)
+        logger.exception("send_message error: %s", exc)
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1280,11 +1334,11 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         return
 
     if resource_name not in RESOURCE_MAP:
-        await update.message.reply_text(f"❌ منبع <b>{resource_name}</b> شناخته نشد!", parse_mode=ParseMode.HTML)
+        await update.message.reply_text(f"❌ منبع شناخته نشد!", parse_mode=ParseMode.HTML)
         return
 
     if amount <= 0:
-        await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
+        await update.message.reply_text("❌ تعداد باید مثبت باشه!")
         return
 
     target_user = None
@@ -1317,8 +1371,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
 
     await update.message.reply_text(
         f"✅ <b>{amount:,} {resource_name}</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
-        f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
-        f"♾️ موجودی تو: <b>بی‌نهایت</b> (دست‌نخورده)",
+        f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>",
         parse_mode=ParseMode.HTML,
     )
 
@@ -1333,11 +1386,11 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             parse_mode=ParseMode.HTML,
         )
     except Exception as exc:
-        logger.exception("send_message to receiver error: %s", exc)
+        logger.exception("send_message error: %s", exc)
 
 
 # ═════════════════════════════════════════════
-# خروج از گروه
+# خروج
 # ═════════════════════════════════════════════
 async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
@@ -1355,8 +1408,7 @@ async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await update.message.reply_text(
             "👋 <b>خداحافظ!</b>\n\n"
-            "از طرف سازنده‌ها، ربات داره از این گروه می‌ره.\n"
-            "اگه دوباره خواستی، ربات رو به گروه اضافه کن. 🌹",
+            "از طرف سازنده‌ها، ربات داره از این گروه می‌ره. 🌹",
             parse_mode=ParseMode.HTML,
         )
     except Exception as exc:
@@ -1364,7 +1416,6 @@ async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     try:
         await context.bot.leave_chat(chat_id=chat.id)
-        logger.info(f"Left group {chat.id} ({chat.title}) by admin {user.id}")
     except Exception as exc:
         logger.exception("leave_chat error: %s", exc)
 
@@ -1381,7 +1432,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # خرید
     buying = context.user_data.get("buying")
     if buying is not None and "amount" not in buying and text.isdigit():
         await process_buy_amount(update, context, int(text))
@@ -1403,33 +1453,28 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # خروج
     if text == "خروج":
         if user.id not in ADMIN_IDS:
             return
         await leave_group_handler(update, context)
         return
 
-    # حمله
     if text == "حمله" or text.startswith("حمله ") or text.startswith("حمله‌"):
         await attack_handler(update, context)
         return
 
-    # حذف انتقال
     if text.startswith("حذف انتقال"):
         if user.id not in ADMIN_IDS:
             return
         await admin_remove_transfer_handler(update, context)
         return
 
-    # انتقال
     if text.startswith("انتقال"):
         if user.id not in ADMIN_IDS:
             return
         await admin_transfer_handler(update, context)
         return
 
-    # کلمات کلیدی
     if text not in KEYWORDS:
         return
 
@@ -1437,6 +1482,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     try:
         db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        await check_daily_food(user.id, update)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
