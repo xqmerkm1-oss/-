@@ -641,7 +641,8 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         worker_count = int(parts[2])
         if worker_count <= 0:
-            raise ValueError    except ValueError:
+            raise ValueError
+    except ValueError:
         await update.message.reply_text("❌ تعداد کارگر باید یه عدد مثبت باشه!")
         return
 
@@ -847,11 +848,7 @@ def extract_target_from_message(message, parts_offset: int) -> tuple[int | None,
 
 
 async def resolve_target(target_id: int | None, target_username: str | None):
-    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه.
-    
-    - اگه با آی‌دی عددی: کاربر اگه نباشه، ساخته می‌شه
-    - اگه با یوزرنیم: باید قبلاً ربات رو استارت کرده باشه
-    """
+    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه."""
     if target_id is not None:
         user, _ = await get_or_create_user_by_id(target_id)
         return user
@@ -1038,10 +1035,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
 # خروج از گروه (فقط سازنده‌ها)
 # ─────────────────────────────────────────────
 async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """دستور خروج — ربات از گروه لفت می‌ده.
-    
-    فقط سازنده‌ها می‌تونن از این دستور استفاده کنن.
-    """
+    """دستور خروج — ربات از گروه لفت می‌ده."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1099,7 +1093,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # 🆕 خروج از گروه (فقط سازنده‌ها)
+    # خروج از گروه (فقط سازنده‌ها)
     if text == "خروج":
         if user.id not in ADMIN_IDS:
             return
