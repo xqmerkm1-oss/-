@@ -14,7 +14,7 @@ RESOURCE_MAP = {
     "گوشت": "meat",
     "چای": "tea",
     "آجر": "bricks",
-    "اجر": "bricks",  # 🆕 با ا هم کار می‌کنه
+    "اجر": "bricks",
     "نون بربری": "bread_count",
     "کیک یزدی": "cake",
     "سیفید": "shields",
@@ -48,6 +48,24 @@ async def get_or_create_user(
             first_name=first_name,
             invited_by=invited_by,
         )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        return user, True
+
+
+async def get_or_create_user_by_id(telegram_id: int) -> tuple[User | None, bool]:
+    """کاربر رو با آی‌دی عددی می‌گیره یا می‌سازه."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is not None:
+            return user, False
+
+        user = User(telegram_id=telegram_id)
         session.add(user)
         await session.commit()
         await session.refresh(user)
