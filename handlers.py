@@ -54,6 +54,7 @@ ADMIN_IDS = [7803165903, 1844792522]
 TEHRAN_TZ = ZoneInfo("Asia/Tehran")
 
 
+# 🎯 کلمات کلیدی (شمع حذف شد)
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
     "دختر خوب": (5, 500),
@@ -61,16 +62,15 @@ KEYWORDS: dict[str, tuple[int, int]] = {
     "نون بربری": (5, 1000),
     "آجر": (5, 3000),
     "اجر": (5, 3000),
-    "شمع": (5, 6000),
     "سیفید": (5, 10000),
     "شومپد": (10, 20000),
 }
 
+# 🎯 نقشه کلمه کلیدی به ستون منبع خاص
 KEYWORD_RESOURCE = {
     "گل رز": "pad_rose",
     "دختر خوب": "pad_girl",
     "پسر خوب": "pad_boy",
-    "شمع": "pad_candle",
     "آجر": "bricks",
     "اجر": "bricks",
     "نون بربری": "bread_count",
@@ -150,8 +150,7 @@ def format_user_profile(db_user, remaining: int) -> str:
         f"🔪 سیفید: <b>{db_user.shields:,}</b>\n\n"
         f"🌹 گل رز: <b>{db_user.pad_rose:,}</b>\n"
         f"🌸 دختر خوب: <b>{db_user.pad_girl:,}</b>\n"
-        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n"
-        f"🕯️ شمع: <b>{db_user.pad_candle:,}</b>\n\n"
+        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n\n"
         f"⚔️ <b>جنگجوها:</b>\n"
         f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
         f"🛡️ لر: <b>{db_user.lords:,}</b>\n\n"
@@ -163,10 +162,9 @@ def format_user_profile(db_user, remaining: int) -> str:
 
 
 # ─────────────────────────────────────────────
-# خرید در حال انجام (بعد از ارسال عدد توسط کاربر)
+# خرید در حال انجام
 # ─────────────────────────────────────────────
 async def process_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: int) -> None:
-    """مرحله دوم خرید: کاربر عدد فرستاد."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -726,13 +724,6 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         logger.exception("DB error: %s", exc)
         return
 
-    if db_user.pads < 6000:
-        await update.message.reply_text(
-            "🔒 بخش منابع وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
     await update.message.reply_text(
         f"🎒 <b>منابع تو</b>\n\n"
         f"🥩 گوشت: <b>{db_user.meat:,}</b>\n"
@@ -743,8 +734,7 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         f"🔪 سیفید: <b>{db_user.shields:,}</b>\n\n"
         f"🌹 گل رز: <b>{db_user.pad_rose:,}</b>\n"
         f"🌸 دختر خوب: <b>{db_user.pad_girl:,}</b>\n"
-        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n"
-        f"🕯️ شمع: <b>{db_user.pad_candle:,}</b>\n\n"
+        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n\n"
         f"⚔️ <b>جنگجوها:</b>\n"
         f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
         f"🛡️ لر: <b>{db_user.lords:,}</b>",
@@ -756,31 +746,20 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # حمله
 # ─────────────────────────────────────────────
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """حمله.
+    
+    فرمت‌ها:
+    - حمله 100 کارگر افغانی → ۱۰۰ کارگر
+    - حمله 100 افغانی → ۱۰۰ کارگر
+    - حمله افغانی‌ها → همه کارگرها
+    - حمله → همه کارگرها
+    - با ریپلای روی پیام حریف
+    """
     if update.message is None or update.effective_user is None:
         return
 
     user = update.effective_user
     text = update.message.text.strip()
-    parts = text.split()
-
-    if len(parts) < 3:
-        await update.message.reply_text(
-            "❌ فرمت درست:\n"
-            "<code>حمله [آی‌دی/یوزرنیم] [تعداد کارگر افغانی]</code>\n\n"
-            "مثال: <code>حمله @ali 10</code>",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
-    target_str = parts[1]
-
-    try:
-        worker_count = int(parts[2])
-        if worker_count <= 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("❌ تعداد کارگر باید یه عدد مثبت باشه!")
-        return
 
     try:
         attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
@@ -788,42 +767,73 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.exception("DB error: %s", exc)
         return
 
-    if attacker.pads < 6000:
+    if attacker.workers < 1:
         await update.message.reply_text(
-            "🔒 بخش جنگ وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
+            "❌ کارگر افغانی نداری! از فروشگاه بخر.",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    if attacker.workers < worker_count:
-        await update.message.reply_text(
-            f"❌ کارگر افغانی کافی نداری!\n"
-            f"🔪 موجودی تو: <b>{attacker.workers:,}</b>\n"
-            f"🎯 نیاز: <b>{worker_count:,}</b>",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
+    # ─── پیدا کردن حریف ───
     target_user = None
-    if target_str.startswith("@"):
-        target_user = await get_user_by_username(target_str)
-    else:
-        try:
-            target_id = int(target_str)
-            target_user = await get_user_by_id(target_id)
-        except ValueError:
-            pass
+
+    if update.message.reply_to_message is not None:
+        replied = update.message.reply_to_message
+        if replied.from_user is not None and not replied.from_user.is_bot:
+            target_user = await get_user_by_id(replied.from_user.id)
 
     if target_user is None:
-        await update.message.reply_text("❌ کاربر پیدا نشد!")
+        parts = text.split()
+        for part in parts[1:]:
+            if part.startswith("@"):
+                target_user = await get_user_by_username(part)
+                if target_user is not None:
+                    break
+            elif part.lstrip("-").isdigit() and len(part) > 5:
+                try:
+                    target_user = await get_user_by_id(int(part))
+                    if target_user is not None:
+                        break
+                except Exception:
+                    pass
+
+    if target_user is None:
+        await update.message.reply_text(
+            "❌ حریف پیدا نشد!\n\n"
+            "📋 روش‌های درست:\n"
+            "1️⃣ روی پیام کاربر <b>ریپلای</b> کن و بنویس:\n"
+            "<code>حمله 100 افغانی</code>\n\n"
+            "2️⃣ یا با آی‌دی/یوزرنیم:\n"
+            "<code>حمله @ali 100 افغانی</code>\n"
+            "<code>حمله 1844792522 50</code>",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     if target_user.telegram_id == user.id:
         await update.message.reply_text("❌ نمی‌تونی به خودت حمله کنی!")
         return
 
+    # ─── پیدا کردن تعداد کارگر ───
+    parts = text.split()
+    worker_count = attacker.workers
+
+    for part in parts[1:]:
+        if part.isdigit():
+            try:
+                count = int(part)
+                if count > 0:
+                    worker_count = min(count, attacker.workers)
+                    break
+            except ValueError:
+                pass
+
+    if worker_count < 1:
+        worker_count = attacker.workers
+
     target_name = target_user.first_name or target_user.username or "کاربر"
 
+    # ─── محاسبه دفاع ───
     available_lords = min(target_user.lords, target_user.bricks)
     workers_killed = available_lords * 4
     remaining_workers = max(0, worker_count - workers_killed)
@@ -956,7 +966,6 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 # ابزار انتقال
 # ─────────────────────────────────────────────
 def extract_target_from_message(message, parts_offset: int) -> tuple[int | None, str | None]:
-    """کاربر هدف رو از پیام پیدا می‌کنه."""
     if message.reply_to_message is not None:
         replied = message.reply_to_message
 
@@ -980,7 +989,6 @@ def extract_target_from_message(message, parts_offset: int) -> tuple[int | None,
 
 
 async def resolve_target(target_id: int | None, target_username: str | None):
-    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه."""
     if target_id is not None:
         user, _ = await get_or_create_user_by_id(target_id)
         return user
@@ -1012,23 +1020,20 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
             "📋 منابع قابل انتقال:\n"
             "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
+            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    # 🎯 پیدا کردن منبع (چند کلمه‌ای یا تک کلمه)
     resource_name = None
     amount = None
     target_offset = None
 
-    # حالت ۱: منابع دو کلمه‌ای
     two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
     two_word_found = False
     for res in two_word_resources:
         res_parts = res.split()
         if len(parts) >= 2 + len(res_parts):
-            # چک کن که parts[1:1+len(res_parts)] با res_parts یکی هست
             if parts[1:1 + len(res_parts)] == res_parts:
                 resource_name = res
                 try:
@@ -1039,7 +1044,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
                     pass
                 break
 
-    # حالت ۲: منابع تک کلمه‌ای
     if not two_word_found and len(parts) >= 3:
         resource_name = parts[1]
         try:
@@ -1051,12 +1055,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     if resource_name is None or amount is None:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
-            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
-            "یا\n"
-            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
-            "📋 منابع قابل انتقال:\n"
-            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
+            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1066,7 +1065,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
             f"📋 منابع معتبر:\n"
             f"<code>پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع</code>",
+            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1080,11 +1079,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     if target_user is None:
         await update.message.reply_text(
-            "❌ کاربر پیدا نشد!\n\n"
-            "📋 روش‌های درست:\n"
-            "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
-            "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
-            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر",
+            "❌ کاربر پیدا نشد!",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1133,14 +1128,11 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     if len(parts) < 4:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
-            "<code>حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
-            "یا\n"
-            "<code>حذف انتقال [منبع] [تعداد]</code> + ریپلای",
+            "<code>حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    # 🎯 پیدا کردن منبع (چند کلمه‌ای یا تک کلمه)
     resource_name = None
     amount = None
     target_offset = None
@@ -1149,7 +1141,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     two_word_found = False
     for res in two_word_resources:
         res_parts = res.split()
-        if len(parts) >= 2 + len(res_parts):
+        if len(parts) >= 3 + len(res_parts):
             if parts[2:2 + len(res_parts)] == res_parts:
                 resource_name = res
                 try:
@@ -1169,18 +1161,11 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             pass
 
     if resource_name is None or amount is None:
-        await update.message.reply_text(
-            "❌ فرمت درست:\n"
-            "<code>حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text("❌ فرمت درست نیست!", parse_mode=ParseMode.HTML)
         return
 
     if resource_name not in RESOURCE_MAP:
-        await update.message.reply_text(
-            f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text(f"❌ منبع <b>{resource_name}</b> شناخته نشد!", parse_mode=ParseMode.HTML)
         return
 
     if amount <= 0:
@@ -1191,14 +1176,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     target_user = await resolve_target(target_id, target_username)
 
     if target_user is None:
-        await update.message.reply_text(
-            "❌ کاربر پیدا نشد!\n\n"
-            "📋 روش‌های درست:\n"
-            "1️⃣ <code>حذف انتقال پد 500 1844792522</code>\n"
-            "2️⃣ <code>حذف انتقال پد 500 @ali</code>\n"
-            "3️⃣ <code>حذف انتقال پد 500</code> + ریپلای روی پیام کاربر",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text("❌ کاربر پیدا نشد!", parse_mode=ParseMode.HTML)
         return
 
     column = RESOURCE_MAP[resource_name]
@@ -1275,7 +1253,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # 🎯 خرید در حال انجام (کاربر عدد فرستاد)
+    # خرید در حال انجام
     buying = context.user_data.get("buying")
     if buying is not None and "amount" not in buying and text.isdigit():
         await process_buy_amount(update, context, int(text))
@@ -1297,7 +1275,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # خروج از گروه (فقط سازنده‌ها)
+    # خروج از گروه
     if text == "خروج":
         if user.id not in ADMIN_IDS:
             return
@@ -1305,7 +1283,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     # حمله
-    if text.startswith("حمله "):
+    if text == "حمله" or text.startswith("حمله ") or text.startswith("حمله‌"):
         await attack_handler(update, context)
         return
 
@@ -1394,8 +1372,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         resource_lines.append(f"🌸 دختر خوب های تو: <b>{fresh_user.pad_girl:,}</b>")
     elif text == "پسر خوب":
         resource_lines.append(f"🌟 پسر خوب های تو: <b>{fresh_user.pad_boy:,}</b>")
-    elif text == "شمع":
-        resource_lines.append(f"🕯️ شمع های تو: <b>{fresh_user.pad_candle:,}</b>")
     elif text in ("آجر", "اجر"):
         resource_lines.append(f"🧱 آجر های تو: <b>{fresh_user.bricks:,}</b>")
     elif text == "نون بربری":
