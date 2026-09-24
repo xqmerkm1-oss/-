@@ -12,6 +12,8 @@ from telegram.ext import (
 from config import BOT_TOKEN
 from database import init_db
 from handlers import (
+    bot_added_to_group,
+    bot_left_group,
     check_membership_callback,
     menu_callback,
     start_handler,
@@ -53,6 +55,23 @@ def build_application() -> Application:
     )
 
     app.add_handler(CommandHandler("start", start_handler))
+
+    # وقتی ربات به گروه اضافه می‌شه
+    app.add_handler(
+        MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS,
+            bot_added_to_group,
+        )
+    )
+
+    # وقتی ربات از گروه حذف می‌شه
+    app.add_handler(
+        MessageHandler(
+            filters.StatusUpdate.LEFT_CHAT_MEMBER,
+            bot_left_group,
+        )
+    )
+
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
     )
