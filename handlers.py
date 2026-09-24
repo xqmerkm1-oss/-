@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -23,22 +22,25 @@ from messages import (
 )
 from repository import (
     HUNGRY_DAYS_LIMIT,
-    LORD_FOOD_CAKE,
     RESOURCE_MAP,
-    WORKER_FOOD_MEAT,
+    add_or_update_group,
     add_pads,
+    get_active_groups_count,
+    get_all_groups,
     get_or_create_user,
     get_or_create_user_by_id,
+    get_stats,
     get_top_users,
     get_user_by_id,
     get_user_by_username,
     give_reward,
     increment_invite_count,
+    log_report,
     mark_bread_used,
+    mark_group_removed,
     process_daily_food,
     seconds_remaining,
     set_user_pads,
-    transfer_resource,
     transfer_shields,
     update_resources,
 )
@@ -84,6 +86,7 @@ CMD_HELP = "راهنما"
 CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
 CMD_RESOURCES = "منابع"
+CMD_REPORT = "گزارش"
 
 
 # ═════════════════════════════════════════════
@@ -97,6 +100,20 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
     except Exception as exc:
         logger.exception("get_chat_member error: %s", exc)
         return True
+
+
+async def notify_admins(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
+    """گزارش رو به همه‌ی سازنده‌ها بفرست."""
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
+        except Exception as exc:
+            logger.exception(f"send to admin {admin_id} error: %s", exc)
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
@@ -132,7 +149,6 @@ def format_user_profile(db_user, remaining: int) -> str:
     username = f"@{db_user.username}" if db_user.username else "ندارد"
     name = db_user.first_name or "دوست عزیز"
 
-    # 🆕 وضعیت گرسنگی
     hungry_status = ""
     if db_user.hungry_days > 0:
         remaining_days = HUNGRY_DAYS_LIMIT - db_user.hungry_days
@@ -169,7 +185,6 @@ def format_user_profile(db_user, remaining: int) -> str:
 
 
 async def check_daily_food(telegram_id: int, update: Update) -> None:
-    """مصرف روزانه رو چک می‌کنه و اگه لازم بود پیام می‌ده."""
     try:
         result = await process_daily_food(telegram_id)
     except Exception as exc:
@@ -198,6 +213,91 @@ async def check_daily_food(telegram_id: int, update: Update) -> None:
             f"🍰 کیک یزدی مصرف‌شده: <b>{result['cake_needed']:,}</b>",
             parse_mode=ParseMode.HTML,
         )
+
+
+# ═════════════════════════════════════════════
+# گزارش اضافه شدن ربات به گروه
+# ═════════════════════════════════════════════
+async def bot_added_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.message
+    if message is None:
+        return
+
+    chat = message.chat
+    if chat.type not in ("group", "supergroup"):
+        return
+
+    added_by = None
+    added_by_name = "نامعلوم"
+    if message.from_user is not None:
+        added_by = message.from_user.id
+        added_by_name = message.from_user.first_name or "کاربر"
+
+    try:
+        member_count = await context.bot.get_chat_member_count(chat.id)
+    except Exception:
+        member_count = 0
+
+    try:
+        await add_or_update_group(
+            group_id=chat.id,
+            title=chat.title or "بدون نام",
+            added_by=added_by,
+            added_by_name=added_by_name,
+            member_count=member_count,
+        )
+        await log_report(
+            event_type="new_group",
+            description=f"ربات به گروه {chat.title} اضافه شد",
+            user_id=added_by,
+            group_id=chat.id,
+        )
+    except Exception as exc:
+        logger.exception("add_or_update_group error: %s", exc)
+
+    await notify_admins(
+        context,
+        f"✅ <b>ربات به گروه جدید اضافه شد!</b>\n\n"
+        f"📛 نام گروه: <b>{chat.title or 'بدون نام'}</b>\n"
+        f"🆔 آی‌دی گروه: <code>{chat.id}</code>\n"
+        f"👤 اضافه‌کننده: <b>{added_by_name}</b> (<code>{added_by or 'نامعلوم'}</code>)\n"
+        f"📊 تعداد اعضا: <b>{member_count:,}</b>",
+    )
+
+
+async def bot_left_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.message
+    if message is None:
+        return
+
+    chat = message.chat
+    if chat.type not in ("group", "supergroup"):
+        return
+
+    removed_by = None
+    removed_by_name = "نامعلوم"
+    if message.from_user is not None:
+        removed_by = message.from_user.id
+        removed_by_name = message.from_user.first_name or "کاربر"
+
+    try:
+        await mark_group_removed(chat.id)
+        await log_report(
+            event_type="left_group",
+            description=f"ربات از گروه {chat.title} حذف شد",
+            user_id=removed_by,
+            group_id=chat.id,
+        )
+    except Exception as exc:
+        logger.exception("mark_group_removed error: %s", exc)
+
+    await notify_admins(
+        context,
+        f"❌ <b>ربات از گروه حذف شد!</b>\n\n"
+        f"📛 نام گروه: <b>{chat.title or 'بدون نام'}</b>\n"
+        f"🆔 آی‌دی گروه: <code>{chat.id}</code>\n"
+        f"👤 حذف‌کننده: <b>{removed_by_name}</b>",
+    )
 
 
 # ═════════════════════════════════════════════
@@ -306,6 +406,25 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.exception("DB error: %s", exc)
         db_user, is_new = None, False
 
+    # 🆕 گزارش کاربر جدید
+    if is_new:
+        try:
+            await log_report(
+                event_type="new_user",
+                description=f"کاربر جدید: {user.first_name} (@{user.username})",
+                user_id=user.id,
+            )
+            await notify_admins(
+                context,
+                f"👤 <b>کاربر جدید!</b>\n\n"
+                f"📛 نام: <b>{user.first_name or 'کاربر'}</b>\n"
+                f"🆔 آی‌دی: <code>{user.id}</code>\n"
+                f"🔗 یوزرنیم: <b>@{user.username or 'ندارد'}</b>\n"
+                f"🎁 دعوت‌کننده: <code>{inviter_id or 'ندارد'}</code>",
+            )
+        except Exception as exc:
+            logger.exception("log new user error: %s", exc)
+
     if is_new and inviter_id is not None and inviter_id != user.id:
         await process_invite(update, context, inviter_id, user)
 
@@ -398,6 +517,62 @@ async def check_membership_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 # ═════════════════════════════════════════════
+# گزارش آمار کلی
+# ═════════════════════════════════════════════
+async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """دستور گزارش — فقط سازنده‌ها."""
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+
+    try:
+        stats = await get_stats()
+        groups = await get_all_groups()
+    except Exception as exc:
+        logger.exception("stats error: %s", exc)
+        await update.message.reply_text("❌ خطا در دریافت آمار")
+        return
+
+    lines = [
+        f"📊 <b>آمار کلی ربات شومپد</b>\n",
+        f"━━━━━━━━━━━━━━━━━━━━",
+        f"👥 <b>کاربران:</b>",
+        f"• کل: <b>{stats['total_users']:,}</b>",
+        f"• ۲۴ ساعت اخیر: <b>{stats['users_24h']:,}</b>",
+        f"• ۷ روز اخیر: <b>{stats['users_7d']:,}</b>\n",
+        f"💬 <b>گروه‌ها:</b>",
+        f"• کل: <b>{stats['total_groups']:,}</b>",
+        f"• فعال: <b>{stats['active_groups']:,}</b>\n",
+        f"⚔️ <b>جنگ‌ها:</b>",
+        f"• کل: <b>{stats['total_attacks']:,}</b>",
+        f"• ۲۴ ساعت اخیر: <b>{stats['attacks_24h']:,}</b>\n",
+        f"🎁 <b>دعوت‌ها:</b> <b>{stats['total_invites']:,}</b>\n",
+        f"💰 <b>منابع در گردش:</b>",
+        f"• پد: <b>{stats['total_pads']:,}</b>",
+        f"• کارگر افغانی: <b>{stats['total_workers']:,}</b>",
+        f"• لر: <b>{stats['total_lords']:,}</b>\n",
+        f"━━━━━━━━━━━━━━━━━━━━",
+        f"📋 <b>آخرین ۱۰ گروه:</b>",
+    ]
+
+    for g in groups[:10]:
+        status = "✅" if g.is_active else "❌"
+        lines.append(
+            f"{status} <b>{g.title or 'بدون نام'}</b> — "
+            f"<code>{g.group_id}</code> — {g.member_count:,} عضو"
+        )
+
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
+    )
+
+
+# ═════════════════════════════════════════════
 # دکمه‌های منو
 # ═════════════════════════════════════════════
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -455,7 +630,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── حساب من ───
     if data == "menu_profile":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
@@ -470,7 +644,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
-    # ─── فروشگاه ───
     if data == "menu_shop":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
@@ -617,7 +790,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text("❌ خرید لغو شد.", reply_markup=back_keyboard())
         return
 
-    # ─── ثبت درخواست حمله ───
     if data.startswith("war_request_"):
         try:
             target_id = int(data.replace("war_request_", ""))
@@ -641,7 +813,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("❌ حریف پیدا نشد!", show_alert=True)
             return
 
-        # 🆕 چک گوشت و چای حریف
         if target_user.meat <= 0 or target_user.tea <= 0:
             await query.answer(
                 f"❌ این کاربر گوشت و چای نداره!\n"
@@ -695,7 +866,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await execute_war(update, context, war)
         return
 
-    # ─── برترها ───
     if data == "menu_top":
         try:
             top_users = await get_top_users(10)
@@ -717,7 +887,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
-    # ─── دعوت دوستان ───
     if data == "menu_invite":
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
@@ -765,7 +934,6 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text("❌ کاربر پیدا نشد", reply_markup=back_keyboard())
         return
 
-    # 🆕 چک گوشت و چای حریف (دوباره، چون ممکنه توی این فاصله عوض شده باشه)
     if target.meat <= 0 or target.tea <= 0:
         await query.edit_message_text(
             f"❌ <b>حمله لغو شد!</b>\n\n"
@@ -790,7 +958,6 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text("❌ کارگر افغانی نداری!", reply_markup=back_keyboard())
         return
 
-    # ─── مرحله ۱ ───
     await query.edit_message_text(
         f"⚔️ <b>جنگ شروع شد!</b>\n\n"
         f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
@@ -802,7 +969,6 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── مرحله ۲ ───
     await query.edit_message_text(
         f"⚔️ <b>جنگ در جریانه!</b>\n\n"
         f"👤 <b>{attacker_name}</b>: <b>{worker_count:,}</b> کارگر افغانی 🔪\n"
@@ -814,7 +980,6 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── مرحله ۳ ───
     await query.edit_message_text(
         f"⚔️ <b>نبرد شروع شد!</b>\n\n"
         f"💥 کارگرهای افغانی به لرها رسیدن!\n\n"
@@ -825,7 +990,6 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── محاسبه ───
     available_lords = min(lord_count, brick_count)
     workers_killed = available_lords * 5
     remaining_workers = max(0, worker_count - workers_killed)
@@ -838,7 +1002,6 @@ async def execute_war(update, context, war: dict) -> None:
         remaining_workers = worker_count
         attacker_new_workers = attacker.workers
 
-    # ─── مرحله ۴ ───
     await query.edit_message_text(
         f"⚔️ <b>کشتار!</b>\n\n"
         f"🛡️ <b>{available_lords:,} لر</b> آجر پرت کردن!\n"
@@ -850,7 +1013,6 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── دزدی ───
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
     stolen_tea = min(stolen_tea, target.tea)
@@ -871,7 +1033,6 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
-    # ─── نتیجه ───
     if remaining_workers > 0:
         result = (
             f"🎉 <b>جنگ تموم شد!</b>\n"
@@ -904,6 +1065,26 @@ async def execute_war(update, context, war: dict) -> None:
         )
 
     await query.edit_message_text(result, parse_mode=ParseMode.HTML)
+
+    # 🆕 گزارش حمله
+    try:
+        await log_report(
+            event_type="attack",
+            description=f"{attacker_name} به {target_name} حمله کرد",
+            user_id=attacker_id,
+            target_id=target_id,
+        )
+        await notify_admins(
+            context,
+            f"⚔️ <b>حمله جدید!</b>\n\n"
+            f"👤 حمله‌کننده: <b>{attacker_name}</b> (<code>{attacker_id}</code>)\n"
+            f"🎯 هدف: <b>{target_name}</b> (<code>{target_id}</code>)\n"
+            f"🔪 کارگرها: <b>{worker_count:,}</b>\n"
+            f"💀 کشته‌شده: <b>{worker_count - remaining_workers:,}</b>\n"
+            f"🎁 غنیمت: <b>+{stolen_meat:,} گوشت</b>، <b>+{stolen_tea:,} چای</b>",
+        )
+    except Exception as exc:
+        logger.exception("log attack error: %s", exc)
 
 
 # ═════════════════════════════════════════════
@@ -1023,7 +1204,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # ─── پیدا کردن حریف ───
     target_user = None
 
     if update.message.reply_to_message is not None:
@@ -1065,7 +1245,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ نمی‌تونی به خودت حمله کنی!")
         return
 
-    # 🆕 چک گوشت و چای حریف
     if target_user.meat <= 0 or target_user.tea <= 0:
         await update.message.reply_text(
             f"❌ <b>حمله لغو شد!</b>\n\n"
@@ -1280,6 +1459,25 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as exc:
         logger.exception("send_message error: %s", exc)
 
+    # 🆕 گزارش انتقال مدیر
+    try:
+        await log_report(
+            event_type="admin_transfer",
+            description=f"انتقال {amount:,} {resource_name} به {target_name}",
+            user_id=user.id,
+            target_id=target_user.telegram_id,
+        )
+        await notify_admins(
+            context,
+            f"📤 <b>انتقال مدیر</b>\n\n"
+            f"👤 از: <b>{user.first_name}</b>\n"
+            f"🎯 به: <b>{target_name}</b> (<code>{target_user.telegram_id}</code>)\n"
+            f"📦 منبع: <b>{resource_name}</b>\n"
+            f"💎 مقدار: <b>{amount:,}</b>",
+        )
+    except Exception as exc:
+        logger.exception("log admin_transfer error: %s", exc)
+
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
@@ -1388,6 +1586,24 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     except Exception as exc:
         logger.exception("send_message error: %s", exc)
 
+    # 🆕 گزارش پس گرفتن
+    try:
+        await log_report(
+            event_type="admin_remove_transfer",
+            description=f"پس گرفتن {amount:,} {resource_name} از {target_name}",
+            user_id=user.id,
+            target_id=target_user.telegram_id,
+        )
+        await notify_admins(
+            context,
+            f"📥 <b>پس گرفتن مدیر</b>\n\n"
+            f"👤 از: <b>{target_name}</b> (<code>{target_user.telegram_id}</code>)\n"
+            f"📦 منبع: <b>{resource_name}</b>\n"
+            f"💎 مقدار: <b>{amount:,}</b>",
+        )
+    except Exception as exc:
+        logger.exception("log admin_remove error: %s", exc)
+
 
 # ═════════════════════════════════════════════
 # خروج
@@ -1448,6 +1664,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     if text == CMD_RESOURCES:
         await resources_handler(update, context)
+        return
+    if text == CMD_REPORT:
+        if user.id not in ADMIN_IDS:
+            return
+        await report_handler(update, context)
         return
     if text.startswith("پرت سیفید"):
         await transfer_shield_handler(update, context)
