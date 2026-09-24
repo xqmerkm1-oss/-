@@ -1,11 +1,12 @@
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from keyboards import (
-    attack_keyboard,
     back_keyboard,
     help_back_keyboard,
     help_keyboard,
@@ -22,7 +23,6 @@ from repository import (
     RESOURCE_MAP,
     add_pads,
     get_or_create_user,
-    get_random_user_in_group,
     get_top_users,
     get_user_by_id,
     get_user_by_username,
@@ -49,6 +49,9 @@ INVITED_REWARD = 250
 # 🎯 سازنده‌های ربات
 ADMIN_IDS = [7803165903, 1844792522]
 
+# 🎯 منطقه‌ی زمانی تهران
+TEHRAN_TZ = ZoneInfo("Asia/Tehran")
+
 
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
@@ -56,18 +59,19 @@ KEYWORDS: dict[str, tuple[int, int]] = {
     "پسر خوب": (5, 500),
     "نون بربری": (5, 1000),
     "آجر": (5, 3000),
+    "اجر": (5, 3000),  # 🆕 با ا
     "شمع": (5, 6000),
     "سیفید": (5, 10000),
     "شومپد": (10, 20000),
 }
 
-# 🎯 نقشه کلمه کلیدی به ستون منبع خاص
 KEYWORD_RESOURCE = {
     "گل رز": "pad_rose",
     "دختر خوب": "pad_girl",
     "پسر خوب": "pad_boy",
     "شمع": "pad_candle",
     "آجر": "bricks",
+    "اجر": "bricks",
     "نون بربری": "bread_count",
     "سیفید": "shields",
     "شومپد": None,
@@ -77,7 +81,6 @@ CMD_HELP = "راهنما"
 CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
 CMD_RESOURCES = "منابع"
-CMD_ATTACK = "حمله"
 
 
 async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
@@ -114,6 +117,49 @@ def invite_keyboard(invite_link: str) -> InlineKeyboardMarkup:
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def format_user_profile(db_user, remaining: int) -> str:
+    """پروفایل کامل کاربر رو می‌سازه."""
+    now = datetime.now(TEHRAN_TZ)
+    date_str = now.strftime("%Y/%m/%d")
+    time_str = now.strftime("%H:%M:%S")
+
+    if remaining > 0:
+        minutes = remaining // 60
+        secs = remaining % 60
+        cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"⏳ {secs} ثانیه"
+    else:
+        cooldown = "✅ آماده"
+
+    username = f"@{db_user.username}" if db_user.username else "ندارد"
+    name = db_user.first_name or "دوست عزیز"
+
+    return (
+        f"👤 <b>پروفایل {name}</b>\n\n"
+        f"📛 نام: <b>{name}</b>\n"
+        f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
+        f"🔗 یوزرنیم: <b>{username}</b>\n\n"
+        f"💎 <b>منابع:</b>\n"
+        f"💎 پدها: <b>{db_user.pads:,}</b>\n"
+        f"🥩 گوشت: <b>{db_user.meat:,}</b>\n"
+        f"🍵 چای: <b>{db_user.tea:,}</b>\n"
+        f"🧱 آجر: <b>{db_user.bricks:,}</b>\n"
+        f"🥖 نون بربری: <b>{db_user.bread_count:,}</b>\n"
+        f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n"
+        f"🔪 سیفید: <b>{db_user.shields:,}</b>\n\n"
+        f"🌹 گل رز: <b>{db_user.pad_rose:,}</b>\n"
+        f"🌸 دختر خوب: <b>{db_user.pad_girl:,}</b>\n"
+        f"🌟 پسر خوب: <b>{db_user.pad_boy:,}</b>\n"
+        f"🕯️ شمع: <b>{db_user.pad_candle:,}</b>\n\n"
+        f"⚔️ <b>جنگجوها:</b>\n"
+        f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
+        f"🛡️ لر: <b>{db_user.lords:,}</b>\n\n"
+        f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
+        f"⏳ وضعیت جایزه: {cooldown}\n\n"
+        f"📅 تاریخ: <b>{date_str}</b>\n"
+        f"🕐 ساعت: <b>{time_str}</b> (تهران)"
+    )
 
 
 # ─────────────────────────────────────────────
@@ -278,7 +324,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
-    # ─── راهنما: توضیحات کوتاه ───
+    # ─── راهنما ───
     if data == "help_short":
         await query.edit_message_text(
             HELP_SHORT_TEXT,
@@ -288,7 +334,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── راهنما: توضیحات کامل ───
     if data == "help_full":
         await query.edit_message_text(
             HELP_FULL_TEXT,
@@ -298,7 +343,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بازگشت به راهنمای اصلی ───
     if data == "help_back":
         await query.edit_message_text(
             HELP_MENU_TEXT,
@@ -318,45 +362,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
 
         remaining = seconds_remaining(db_user)
-        if remaining > 0:
-            minutes = remaining // 60
-            secs = remaining % 60
-            cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"⏳ {secs} ثانیه"
-        else:
-            cooldown = "✅ آماده"
-
-        username = f"@{db_user.username}" if db_user.username else "ندارد"
-        name = db_user.first_name or "دوست عزیز"
-
-        if db_user.pads >= 20000:
-            unlock_status = "✅ همه کلمات باز شده!"
-        elif db_user.pads >= 10000:
-            unlock_status = "✅ <b>سیفید</b> باز شده!"
-        elif db_user.pads >= 6000:
-            unlock_status = "✅ <b>شمع</b> باز شده!"
-        elif db_user.pads >= 3000:
-            unlock_status = "✅ <b>آجر</b> باز شده!"
-        elif db_user.pads >= 1000:
-            unlock_status = "✅ <b>نون بربری</b> باز شده!"
-        elif db_user.pads >= 500:
-            unlock_status = "✅ <b>دختر خوب</b> و <b>پسر خوب</b> باز شده!"
-        else:
-            needed = 500 - db_user.pads
-            unlock_status = f"🔒 {needed} پد دیگه تا باز شدن <b>دختر خوب</b> و <b>پسر خوب</b>"
-
-        bread_status = ""
-        if db_user.bread_used:
-            bread_status = "\n⚠️ چون <b>نون بربری</b> زدی، <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
+        text = format_user_profile(db_user, remaining)
 
         await query.edit_message_text(
-            f"👤 <b>حساب من</b>\n\n"
-            f"📛 نام: <b>{name}</b>\n"
-            f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
-            f"🔗 یوزرنیم: <b>{username}</b>\n"
-            f"💎 پدها: <b>{db_user.pads:,}</b>\n"
-            f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
-            f"⏳ وضعیت جایزه: {cooldown}\n\n"
-            f"{unlock_status}{bread_status}",
+            text,
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
@@ -518,27 +527,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── تایید حمله ───
-    if data.startswith("attack_confirm_"):
-        try:
-            target_id = int(data.replace("attack_confirm_", ""))
-        except ValueError:
-            await query.answer("❌ خطا", show_alert=True)
-            return
-
-        await execute_attack(update, context, user, target_id)
-        return
-
-    if data == "attack_cancel":
-        await query.edit_message_text(
-            "❌ حمله لغو شد.",
-            reply_markup=back_keyboard(),
-        )
-        return
-
 
 # ─────────────────────────────────────────────
-# راهنما، پروفایل، برترها، منابع، حمله
+# راهنما، پروفایل، برترها، منابع
 # ─────────────────────────────────────────────
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
@@ -563,26 +554,9 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     remaining = seconds_remaining(db_user)
-    if remaining > 0:
-        minutes = remaining // 60
-        secs = remaining % 60
-        cooldown = f"⏳ {minutes} دقیقه و {secs} ثانیه" if minutes > 0 else f"⏳ {secs} ثانیه"
-    else:
-        cooldown = "✅ آماده"
+    text = format_user_profile(db_user, remaining)
 
-    name = db_user.first_name or "دوست عزیز"
-    username = f"@{db_user.username}" if db_user.username else "ندارد"
-
-    await update.message.reply_text(
-        f"👤 <b>حساب من</b>\n\n"
-        f"📛 نام: <b>{name}</b>\n"
-        f"🆔 آی‌دی عددی: <code>{db_user.telegram_id}</code>\n"
-        f"🔗 یوزرنیم: <b>{username}</b>\n"
-        f"💎 پدها: <b>{db_user.pads:,}</b>\n"
-        f"🎁 تعداد دعوت: <b>{db_user.invite_count}</b>\n"
-        f"⏳ وضعیت: {cooldown}",
-        parse_mode=ParseMode.HTML,
-    )
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -605,10 +579,7 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         name = u.first_name or u.username or f"کاربر {u.telegram_id}"
         lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
 
-    await update.message.reply_text(
-        "\n".join(lines),
-        parse_mode=ParseMode.HTML,
-    )
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -648,100 +619,154 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
 
+# ─────────────────────────────────────────────
+# حمله
+# ─────────────────────────────────────────────
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """حمله: حمله [آی‌دی/یوزرنیم] [تعداد کارگر افغانی]"""
     if update.message is None or update.effective_user is None:
         return
 
     user = update.effective_user
+    text = update.message.text.strip()
+    parts = text.split()
+
+    # فرمت: حمله @ali 10
+    if len(parts) < 3:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>حمله [آی‌دی/یوزرنیم] [تعداد کارگر افغانی]</code>\n\n"
+            "مثال: <code>حمله @ali 10</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    target_str = parts[1]
+
     try:
-        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        worker_count = int(parts[2])
+        if worker_count <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ تعداد کارگر باید یه عدد مثبت باشه!")
+        return
+
+    # پیدا کردن حمله‌کننده و حریف
+    try:
+        attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
         logger.exception("DB error: %s", exc)
         return
 
-    if db_user.pads < 6000:
+    if attacker.pads < 6000:
         await update.message.reply_text(
             "🔒 بخش جنگ وقتی <b>شمع</b> برات باز بشه فعال می‌شه! (۶۰۰۰ پد)",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    if db_user.workers < 1:
+    if attacker.workers < worker_count:
         await update.message.reply_text(
-            "❌ کارگر افغانی نداری! از فروشگاه بخر.",
+            f"❌ کارگر افغانی کافی نداری!\n"
+            f"🔪 موجودی تو: <b>{attacker.workers:,}</b>\n"
+            f"🎯 نیاز: <b>{worker_count:,}</b>",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    target = await get_random_user_in_group(context, update.effective_chat.id, user.id)
-    if target is None:
-        await update.message.reply_text("❌ کسی برای حمله پیدا نشد!")
+    # پیدا کردن حریف
+    target_user = None
+    if target_str.startswith("@"):
+        target_user = await get_user_by_username(target_str)
+    else:
+        try:
+            target_id = int(target_str)
+            target_user = await get_user_by_id(target_id)
+        except ValueError:
+            pass
+
+    if target_user is None:
+        await update.message.reply_text("❌ کاربر پیدا نشد!")
         return
 
-    target_name = target.first_name or target.username or "کاربر"
-
-    await update.message.reply_text(
-        f"⚔️ <b>آماده‌ی حمله به {target_name} هستی!</b>\n\n"
-        f"🔪 کارگرهای افغانی تو: <b>{db_user.workers:,}</b>\n"
-        f"🛡️ لرهای حریف: <b>{target.lords:,}</b>\n\n"
-        f"تایید می‌کنی؟",
-        parse_mode=ParseMode.HTML,
-        reply_markup=attack_keyboard(target.telegram_id),
-    )
-
-
-async def execute_attack(update, context, user, target_id: int) -> None:
-    query = update.callback_query
-
-    try:
-        attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
-        defender = await get_user_by_id(target_id)
-    except Exception as exc:
-        logger.exception("DB error: %s", exc)
-        await query.edit_message_text("❌ خطا در حمله.", reply_markup=back_keyboard())
+    if target_user.telegram_id == user.id:
+        await update.message.reply_text("❌ نمی‌تونی به خودت حمله کنی!")
         return
 
-    if defender is None:
-        await query.edit_message_text("❌ حریف پیدا نشد.", reply_markup=back_keyboard())
-        return
+    target_name = target_user.first_name or target_user.username or "کاربر"
 
-    workers = attacker.workers
-    lords = defender.lords
-    bricks_thrown = lords * 14
+    # ─── محاسبه دفاع خودکار ───
+    # تعداد لرهای قابل استفاده = کمترین مقدار بین لر و آجر
+    available_lords = min(target_user.lords, target_user.bricks)
+    workers_killed = available_lords * 4
+    remaining_workers = max(0, worker_count - workers_killed)
 
-    if lords >= workers * 1.4:
-        await update_resources(user.id, workers=0)
-        await query.edit_message_text(
-            f"💥 <b>حمله شکست خورد!</b>\n\n"
-            f"🛡️ لرهای حریف <b>{bricks_thrown:,}</b> آجر پرت کردن!\n"
-            f"🔪 تمام <b>{workers:,}</b> کارگر افغانی تو کشته شدن. 🪦",
-            parse_mode=ParseMode.HTML,
-            reply_markup=back_keyboard(),
-        )
-        return
+    # اگه حمله‌کننده هیچ کارگری از دست نداد (حریف لر/آجر نداشت)
+    if available_lords == 0:
+        # همه کارگرها باقی می‌مونن
+        remaining_workers = worker_count
+        attacker_new_workers = attacker.workers  # هیچی کم نمی‌شه
+    else:
+        # کارگرهای کشته‌شده از حمله‌کننده کم می‌شن
+        attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
+        if attacker_new_workers < 0:
+            attacker_new_workers = 0
 
-    stolen_meat = min(50, defender.meat)
-    stolen_tea = min(25, defender.tea)
+    # ─── محاسبه دزدی ───
+    stolen_tea = remaining_workers * 3
+    stolen_meat = remaining_workers * 1
 
+    # محدودیت: نمی‌تونه بیشتر از موجودی حریف دزدی کنه
+    stolen_tea = min(stolen_tea, target_user.tea)
+    stolen_meat = min(stolen_meat, target_user.meat)
+
+    # ─── به‌روزرسانی حمله‌کننده ───
     await update_resources(
         user.id,
-        workers=0,
-        meat=attacker.meat + stolen_meat,
+        workers=attacker_new_workers,
         tea=attacker.tea + stolen_tea,
-    )
-    await update_resources(
-        target_id,
-        meat=defender.meat - stolen_meat,
-        tea=defender.tea - stolen_tea,
+        meat=attacker.meat + stolen_meat,
     )
 
-    await query.edit_message_text(
-        f"🎉 <b>حمله موفق!</b>\n\n"
-        f"🥩 <b>{stolen_meat:,}</b> گوشت دزدیدی!\n"
-        f"🍵 <b>{stolen_tea:,}</b> چای دزدیدی!\n\n"
-        f"🔪 <b>{workers:,}</b> کارگر افغانی تو قربانی شدن.",
+    # ─── به‌روزرسانی حریف ───
+    new_lords = target_user.lords - available_lords
+    new_bricks = target_user.bricks - available_lords
+    new_tea = target_user.tea - stolen_tea
+    new_meat = target_user.meat - stolen_meat
+
+    await update_resources(
+        target_user.telegram_id,
+        lords=new_lords,
+        bricks=new_bricks,
+        tea=new_tea,
+        meat=new_meat,
+    )
+
+    # ─── نتیجه ───
+    result_lines = [f"⚔️ <b>نتیجه‌ی حمله</b>\n"]
+    result_lines.append(f"👤 حمله‌کننده: <b>{attacker.first_name}</b>")
+    result_lines.append(f"🎯 هدف: <b>{target_name}</b>")
+    result_lines.append(f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>")
+    result_lines.append("")
+
+    if available_lords > 0:
+        result_lines.append(f"🛡️ لرهای دفاعی حریف: <b>{available_lords:,}</b>")
+        result_lines.append(f"💀 کارگرهای کشته‌شده: <b>{worker_count - remaining_workers:,}</b>")
+        result_lines.append(f"🧱 آجر مصرف‌شده: <b>{available_lords:,}</b>")
+
+    result_lines.append(f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>")
+    result_lines.append("")
+
+    if remaining_workers > 0:
+        result_lines.append(f"🎁 <b>دزدی:</b>")
+        result_lines.append(f"🥩 گوشت: <b>+{stolen_meat:,}</b>")
+        result_lines.append(f"🍵 چای: <b>+{stolen_tea:,}</b>")
+    else:
+        result_lines.append(f"💥 <b>حمله شکست خورد!</b>")
+
+    await update.message.reply_text(
+        "\n".join(result_lines),
         parse_mode=ParseMode.HTML,
-        reply_markup=back_keyboard(),
     )
 
 
@@ -809,10 +834,10 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ─────────────────────────────────────────────
-# انتقال منابع توسط سازنده‌ها (نامحدود)
+# انتقال منابع توسط سازنده‌ها (بی‌نهایت)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال هر منبعی توسط سازنده‌ها — نامحدود."""
+    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت (از سازنده کم نمی‌شه)."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -828,10 +853,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             "❌ فرمت درست:\n"
             "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
             "یا\n"
-            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
-            "📋 منابع قابل انتقال:\n"
-            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
+            "<code>انتقال [منبع] [تعداد]</code> + ریپلای",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -839,10 +861,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     resource_name = parts[1]
     if resource_name not in RESOURCE_MAP:
         await update.message.reply_text(
-            f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
-            f"📋 منابع معتبر:\n"
-            f"<code>پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع</code>",
+            f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -876,26 +895,24 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     if target_user is None:
         await update.message.reply_text(
-            "❌ کاربر پیدا نشد!\n"
-            "می‌تونی آی‌دی عددی یا یوزرنیم بدی، یا روی پیام کاربر ریپلای کنی.",
+            "❌ کاربر پیدا نشد!",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    success, sender_new, receiver_new = await transfer_resource(
-        user.id, target_user.telegram_id, resource_name, amount
-    )
+    # 🎯 سازنده بی‌نهایت — فقط به گیرنده اضافه می‌شه
+    column = RESOURCE_MAP[resource_name]
+    receiver_current = getattr(target_user, column)
+    receiver_new = receiver_current + amount
 
-    if not success:
-        await update.message.reply_text("❌ خطا در انتقال!")
-        return
+    await update_resources(target_user.telegram_id, **{column: receiver_new})
 
     target_name = target_user.first_name or target_user.username or "کاربر"
 
     await update.message.reply_text(
         f"✅ <b>{amount:,} {resource_name}</b> به <b>{target_name}</b> منتقل شد!\n\n"
         f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
-        f"📦 موجودی جدید تو: <b>{sender_new:,}</b>",
+        f"♾️ موجودی تو: <b>بی‌نهایت</b> (دست‌نخورده)",
         parse_mode=ParseMode.HTML,
     )
 
@@ -912,25 +929,9 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as exc:
         logger.exception("send_message to receiver error: %s", exc)
 
-    try:
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=(
-                f"📤 <b>انتقال انجام شد</b>\n\n"
-                f"📦 منبع: <b>{resource_name}</b>\n"
-                f"👤 گیرنده: <b>{target_name}</b>\n"
-                f"💎 مقدار: <b>{amount:,}</b>\n"
-                f"💰 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
-                f"💰 موجودی جدید تو: <b>{sender_new:,}</b>"
-            ),
-            parse_mode=ParseMode.HTML,
-        )
-    except Exception as exc:
-        logger.exception("send_message to sender error: %s", exc)
-
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال هر منبعی توسط سازنده‌ها — نامحدود."""
+    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت (به سازنده اضافه نمی‌شه)."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -985,27 +986,22 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
                 pass
 
     if target_user is None:
-        await update.message.reply_text(
-            "❌ کاربر پیدا نشد!",
-            parse_mode=ParseMode.HTML,
-        )
+        await update.message.reply_text("❌ کاربر پیدا نشد!", parse_mode=ParseMode.HTML)
         return
 
-    # انتقال معکوس: از گیرنده به سازنده
-    success, target_new, sender_new = await transfer_resource(
-        target_user.telegram_id, user.id, resource_name, amount
-    )
+    # 🎯 فقط از گیرنده کم می‌شه — به سازنده اضافه نمی‌شه
+    column = RESOURCE_MAP[resource_name]
+    receiver_current = getattr(target_user, column)
+    receiver_new = receiver_current - amount
 
-    if not success:
-        await update.message.reply_text("❌ خطا در حذف انتقال!")
-        return
+    await update_resources(target_user.telegram_id, **{column: receiver_new})
 
     target_name = target_user.first_name or target_user.username or "کاربر"
 
     await update.message.reply_text(
         f"✅ <b>{amount:,} {resource_name}</b> از <b>{target_name}</b> پس گرفته شد!\n\n"
-        f"📦 موجودی جدید گیرنده: <b>{target_new:,}</b>\n"
-        f"📦 موجودی جدید تو: <b>{sender_new:,}</b>",
+        f"📦 موجودی جدید گیرنده: <b>{receiver_new:,}</b>\n"
+        f"♾️ موجودی تو: <b>بی‌نهایت</b> (دست‌نخورده)",
         parse_mode=ParseMode.HTML,
     )
 
@@ -1015,7 +1011,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             text=(
                 f"⚠️ <b>اطلاعیه مدیریت</b>\n\n"
                 f"📦 <b>{amount:,} {resource_name}</b> ازت پس گرفته شد.\n"
-                f"💰 موجودی جدید تو: <b>{target_new:,}</b>"
+                f"💰 موجودی جدید تو: <b>{receiver_new:,}</b>"
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -1035,6 +1031,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
+    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -1047,27 +1044,30 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if text == CMD_RESOURCES:
         await resources_handler(update, context)
         return
-    if text == CMD_ATTACK:
-        await attack_handler(update, context)
-        return
     if text.startswith("پرت سیفید"):
         await transfer_shield_handler(update, context)
         return
 
-    # حذف انتقال (قبل از انتقال چک بشه)
+    # حمله
+    if text.startswith("حمله "):
+        await attack_handler(update, context)
+        return
+
+    # حذف انتقال
     if text.startswith("حذف انتقال"):
         if user.id not in ADMIN_IDS:
             return
         await admin_remove_transfer_handler(update, context)
         return
 
-    # انتقال (فقط سازنده‌ها)
+    # انتقال
     if text.startswith("انتقال"):
         if user.id not in ADMIN_IDS:
             return
         await admin_transfer_handler(update, context)
         return
 
+    # کلمات کلیدی
     if text not in KEYWORDS:
         return
 
@@ -1130,10 +1130,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await mark_bread_used(user.id)
         bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
-    # خوندن دوباره کاربر برای نمایش آخرین مقادیر
+    # خوندن دوباره کاربر
     fresh_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
 
-    # ساخت متن نمایش منابع
+    # نمایش منبع
     resource_lines = []
     if text == "گل رز":
         resource_lines.append(f"🌹 گل رز های تو: <b>{fresh_user.pad_rose:,}</b>")
@@ -1143,7 +1143,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         resource_lines.append(f"🌟 پسر خوب های تو: <b>{fresh_user.pad_boy:,}</b>")
     elif text == "شمع":
         resource_lines.append(f"🕯️ شمع های تو: <b>{fresh_user.pad_candle:,}</b>")
-    elif text == "آجر":
+    elif text in ("آجر", "اجر"):
         resource_lines.append(f"🧱 آجر های تو: <b>{fresh_user.bricks:,}</b>")
     elif text == "نون بربری":
         resource_lines.append(f"🥖 نون بربری های تو: <b>{fresh_user.bread_count:,}</b>")
