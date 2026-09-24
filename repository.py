@@ -7,13 +7,11 @@ from models import User
 
 COOLDOWN_SECONDS = 180
 
-# 🎯 خوراک روزانه
-WORKER_FOOD_MEAT = 1       # هر کارگر ۱ گوشت/روز
-LORD_FOOD_CAKE = 3         # هر لر ۳ کیک یزدی/روز
-HUNGRY_DAYS_LIMIT = 7      # ۷ روز گرسنگی → مرگ همه جنگجوها
+WORKER_FOOD_MEAT = 1
+LORD_FOOD_CAKE = 3
+HUNGRY_DAYS_LIMIT = 7
 
 
-# 🎯 نقشه‌ی اسم منبع به ستون دیتابیس
 RESOURCE_MAP = {
     "پد": "pads",
     "پدها": "pads",
@@ -228,19 +226,6 @@ async def update_resources(
 
 
 async def process_daily_food(telegram_id: int) -> dict:
-    """مصرف روزانه رو حساب می‌کنه.
-    
-    برمی‌گردونه:
-    {
-        "processed": bool,
-        "days": int,
-        "meat_needed": int,
-        "cake_needed": int,
-        "starved": bool,
-        "workers_lost": int,
-        "lords_lost": int,
-    }
-    """
     result_data = {
         "processed": False,
         "days": 0,
@@ -259,7 +244,6 @@ async def process_daily_food(telegram_id: int) -> dict:
         if user is None:
             return result_data
 
-        # اگه جنگجو نداره، کاری نکن
         if user.workers <= 0 and user.lords <= 0:
             user.last_fed_at = datetime.now(timezone.utc)
             user.hungry_days = 0
@@ -274,7 +258,6 @@ async def process_daily_food(telegram_id: int) -> dict:
             await session.commit()
             return result_data
 
-        # اگه تایم‌زون نداره، اضافه کن
         if last_fed.tzinfo is None:
             last_fed = last_fed.replace(tzinfo=timezone.utc)
 
@@ -288,7 +271,6 @@ async def process_daily_food(telegram_id: int) -> dict:
         result_data["days"] = days_passed
 
         for _ in range(days_passed):
-            # چک کن کاربر چقدر خوراک لازم داره
             meat_needed = user.workers * WORKER_FOOD_MEAT
             cake_needed = user.lords * LORD_FOOD_CAKE
 
@@ -296,16 +278,13 @@ async def process_daily_food(telegram_id: int) -> dict:
             result_data["cake_needed"] = cake_needed
 
             if user.meat >= meat_needed and user.cake >= cake_needed:
-                # همه چی خوبه
                 user.meat -= meat_needed
                 user.cake -= cake_needed
                 user.hungry_days = 0
             else:
-                # گرسنگی
                 user.hungry_days += 1
 
                 if user.hungry_days >= HUNGRY_DAYS_LIMIT:
-                    # همه‌ی جنگجوها می‌میرن
                     result_data["starved"] = True
                     result_data["workers_lost"] = user.workers
                     result_data["lords_lost"] = user.lords
@@ -386,15 +365,3 @@ async def get_top_users(limit: int = 10) -> list[User]:
             select(User).order_by(desc(User.pads)).limit(limit)
         )
         return list(result.scalars().all())
-
-
-async def get_random_user_in_group(
-    context, chat_id: int, exclude_id: int
-) -> User | None:
-    import random
-
-    top = await get_top_users(20)
-    candidates = [u for u in top if u.telegram_id != exclude_id]
-    if not candidates:
-        return None
-    return random.choice(candidates)
