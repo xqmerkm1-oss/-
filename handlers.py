@@ -59,7 +59,7 @@ KEYWORDS: dict[str, tuple[int, int]] = {
     "پسر خوب": (5, 500),
     "نون بربری": (5, 1000),
     "آجر": (5, 3000),
-    "اجر": (5, 3000),  # 🆕 با ا
+    "اجر": (5, 3000),
     "شمع": (5, 6000),
     "سیفید": (5, 10000),
     "شومپد": (10, 20000),
@@ -120,7 +120,6 @@ def invite_keyboard(invite_link: str) -> InlineKeyboardMarkup:
 
 
 def format_user_profile(db_user, remaining: int) -> str:
-    """پروفایل کامل کاربر رو می‌سازه."""
     now = datetime.now(TEHRAN_TZ)
     date_str = now.strftime("%Y/%m/%d")
     time_str = now.strftime("%H:%M:%S")
@@ -631,7 +630,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     text = update.message.text.strip()
     parts = text.split()
 
-    # فرمت: حمله @ali 10
     if len(parts) < 3:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
@@ -651,7 +649,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ تعداد کارگر باید یه عدد مثبت باشه!")
         return
 
-    # پیدا کردن حمله‌کننده و حریف
     try:
         attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
     except Exception as exc:
@@ -674,7 +671,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # پیدا کردن حریف
     target_user = None
     if target_str.startswith("@"):
         target_user = await get_user_by_username(target_str)
@@ -695,32 +691,24 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     target_name = target_user.first_name or target_user.username or "کاربر"
 
-    # ─── محاسبه دفاع خودکار ───
-    # تعداد لرهای قابل استفاده = کمترین مقدار بین لر و آجر
     available_lords = min(target_user.lords, target_user.bricks)
     workers_killed = available_lords * 4
     remaining_workers = max(0, worker_count - workers_killed)
 
-    # اگه حمله‌کننده هیچ کارگری از دست نداد (حریف لر/آجر نداشت)
     if available_lords == 0:
-        # همه کارگرها باقی می‌مونن
         remaining_workers = worker_count
-        attacker_new_workers = attacker.workers  # هیچی کم نمی‌شه
+        attacker_new_workers = attacker.workers
     else:
-        # کارگرهای کشته‌شده از حمله‌کننده کم می‌شن
         attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
         if attacker_new_workers < 0:
             attacker_new_workers = 0
 
-    # ─── محاسبه دزدی ───
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
 
-    # محدودیت: نمی‌تونه بیشتر از موجودی حریف دزدی کنه
     stolen_tea = min(stolen_tea, target_user.tea)
     stolen_meat = min(stolen_meat, target_user.meat)
 
-    # ─── به‌روزرسانی حمله‌کننده ───
     await update_resources(
         user.id,
         workers=attacker_new_workers,
@@ -728,7 +716,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         meat=attacker.meat + stolen_meat,
     )
 
-    # ─── به‌روزرسانی حریف ───
     new_lords = target_user.lords - available_lords
     new_bricks = target_user.bricks - available_lords
     new_tea = target_user.tea - stolen_tea
@@ -742,7 +729,6 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         meat=new_meat,
     )
 
-    # ─── نتیجه ───
     result_lines = [f"⚔️ <b>نتیجه‌ی حمله</b>\n"]
     result_lines.append(f"👤 حمله‌کننده: <b>{attacker.first_name}</b>")
     result_lines.append(f"🎯 هدف: <b>{target_name}</b>")
@@ -834,10 +820,62 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ─────────────────────────────────────────────
+# ابزار انتقال (کشف کاربر هدف)
+# ─────────────────────────────────────────────
+def extract_target_from_message(message, parts_offset: int) -> tuple[int | None, str | None]:
+    """کاربر هدف رو از پیام پیدا می‌کنه.
+
+    روش‌ها:
+    1. ریپلای روی پیام کاربر → از from_user
+    2. ریپلای روی پیامی که متنش آی‌دی عددی هست
+    3. آی‌دی/یوزرنیم توی خود دستور
+    """
+    # ─── حالت ۱: ریپلای ───
+    if message.reply_to_message is not None:
+        replied = message.reply_to_message
+
+        # ۱.۱: ریپلای روی پیام کاربر
+        if replied.from_user is not None and not replied.from_user.is_bot:
+            return replied.from_user.id, None
+
+        # ۱.۲: ریپلای روی پیامی که متنش آی‌دی عددیه
+        if replied.text:
+            replied_text = replied.text.strip()
+            if replied_text.isdigit():
+                return int(replied_text), None
+
+    # ─── حالت ۲: آی‌دی/یوزرنیم توی خود دستور ───
+    parts = message.text.split()
+    if len(parts) > parts_offset:
+        target_str = parts[parts_offset]
+        if target_str.startswith("@"):
+            return None, target_str
+        elif target_str.lstrip("-").isdigit():
+            return int(target_str), None
+
+    return None, None
+
+
+async def resolve_target(target_id: int | None, target_username: str | None):
+    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه."""
+    if target_id is not None:
+        return await get_user_by_id(target_id)
+    if target_username is not None:
+        return await get_user_by_username(target_username)
+    return None
+
+
+# ─────────────────────────────────────────────
 # انتقال منابع توسط سازنده‌ها (بی‌نهایت)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت (از سازنده کم نمی‌شه)."""
+    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت.
+
+    روش‌ها:
+    1. انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]
+    2. انتقال [منبع] [تعداد]  + ریپلای روی پیام کاربر
+    3. انتقال [منبع] [تعداد]  + ریپلای روی پیامی که آی‌دی عددی فرستاده
+    """
     if update.message is None or update.effective_user is None:
         return
 
@@ -848,12 +886,16 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     parts = text.split()
+
     if len(parts) < 3:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
             "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
             "یا\n"
-            "<code>انتقال [منبع] [تعداد]</code> + ریپلای",
+            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
+            "📋 منابع قابل انتقال:\n"
+            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
+            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -861,7 +903,10 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     resource_name = parts[1]
     if resource_name not in RESOURCE_MAP:
         await update.message.reply_text(
-            f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
+            f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
+            f"📋 منابع معتبر:\n"
+            f"<code>پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
+            f"کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -874,28 +919,17 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_user = None
-
-    if update.message.reply_to_message is not None:
-        reply_user = update.message.reply_to_message.from_user
-        if reply_user is not None:
-            target_user, _ = await get_or_create_user(
-                reply_user.id, reply_user.username, reply_user.first_name
-            )
-    elif len(parts) >= 4:
-        target_str = parts[3]
-        if target_str.startswith("@"):
-            target_user = await get_user_by_username(target_str)
-        else:
-            try:
-                target_id = int(target_str)
-                target_user = await get_user_by_id(target_id)
-            except ValueError:
-                pass
+    target_id, target_username = extract_target_from_message(update.message, 3)
+    target_user = await resolve_target(target_id, target_username)
 
     if target_user is None:
         await update.message.reply_text(
-            "❌ کاربر پیدا نشد!",
+            "❌ کاربر پیدا نشد!\n\n"
+            "📋 روش‌های درست:\n"
+            "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
+            "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
+            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر\n"
+            "4️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیامی که آی‌دی عددی نوشته",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -931,7 +965,12 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت (به سازنده اضافه نمی‌شه)."""
+    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت.
+
+    روش‌ها:
+    1. حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]
+    2. حذف انتقال [منبع] [تعداد]  + ریپلای
+    """
     if update.message is None or update.effective_user is None:
         return
 
@@ -942,6 +981,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         return
 
     parts = text.split()
+
     if len(parts) < 4:
         await update.message.reply_text(
             "❌ فرمت درست:\n"
@@ -968,25 +1008,18 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_user = None
-
-    if update.message.reply_to_message is not None:
-        reply_user = update.message.reply_to_message.from_user
-        if reply_user is not None:
-            target_user = await get_user_by_id(reply_user.id)
-    elif len(parts) >= 5:
-        target_str = parts[4]
-        if target_str.startswith("@"):
-            target_user = await get_user_by_username(target_str)
-        else:
-            try:
-                target_id = int(target_str)
-                target_user = await get_user_by_id(target_id)
-            except ValueError:
-                pass
+    target_id, target_username = extract_target_from_message(update.message, 4)
+    target_user = await resolve_target(target_id, target_username)
 
     if target_user is None:
-        await update.message.reply_text("❌ کاربر پیدا نشد!", parse_mode=ParseMode.HTML)
+        await update.message.reply_text(
+            "❌ کاربر پیدا نشد!\n\n"
+            "📋 روش‌های درست:\n"
+            "1️⃣ <code>حذف انتقال پد 500 1844792522</code>\n"
+            "2️⃣ <code>حذف انتقال پد 500 @ali</code>\n"
+            "3️⃣ <code>حذف انتقال پد 500</code> + ریپلای روی پیام کاربر",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     # 🎯 فقط از گیرنده کم می‌شه — به سازنده اضافه نمی‌شه
@@ -1031,7 +1064,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -1119,7 +1151,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if updated is None:
         return
 
-    # افزایش منبع خاص
     resource_column = KEYWORD_RESOURCE.get(text)
     if resource_column is not None:
         current_val = getattr(updated, resource_column)
@@ -1130,10 +1161,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await mark_bread_used(user.id)
         bread_msg = "\n\n⚠️ از این به بعد <b>دختر خوب</b> و <b>پسر خوب</b> برات قفل شده!"
 
-    # خوندن دوباره کاربر
     fresh_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
 
-    # نمایش منبع
     resource_lines = []
     if text == "گل رز":
         resource_lines.append(f"🌹 گل رز های تو: <b>{fresh_user.pad_rose:,}</b>")
