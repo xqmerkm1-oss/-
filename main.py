@@ -38,6 +38,7 @@ def build_application() -> Application:
         .build()
     )
 
+    # عضویت اجباری
     app.add_handler(
         CallbackQueryHandler(
             check_membership_callback,
@@ -45,10 +46,11 @@ def build_application() -> Application:
         )
     )
 
+    # همه دکمه‌ها
     app.add_handler(
         CallbackQueryHandler(
             menu_callback,
-            pattern=r"^(menu_|shop_|help_)",
+            pattern=r"^(menu_|shop_|help_|confirm_buy$|cancel_buy$)",
         )
     )
 
