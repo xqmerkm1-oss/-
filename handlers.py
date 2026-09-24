@@ -23,6 +23,7 @@ from repository import (
     RESOURCE_MAP,
     add_pads,
     get_or_create_user,
+    get_or_create_user_by_id,
     get_top_users,
     get_user_by_id,
     get_user_by_username,
@@ -305,7 +306,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
-    # ─── بازگشت ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -315,7 +315,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بستن پنل ───
     if data == "menu_close":
         try:
             await query.message.delete()
@@ -323,7 +322,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
-    # ─── راهنما ───
     if data == "help_short":
         await query.edit_message_text(
             HELP_SHORT_TEXT,
@@ -622,7 +620,6 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # حمله
 # ─────────────────────────────────────────────
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حمله: حمله [آی‌دی/یوزرنیم] [تعداد کارگر افغانی]"""
     if update.message is None or update.effective_user is None:
         return
 
@@ -644,8 +641,7 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         worker_count = int(parts[2])
         if worker_count <= 0:
-            raise ValueError
-    except ValueError:
+            raise ValueError    except ValueError:
         await update.message.reply_text("❌ تعداد کارگر باید یه عدد مثبت باشه!")
         return
 
@@ -820,16 +816,10 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 # ─────────────────────────────────────────────
-# ابزار انتقال (کشف کاربر هدف)
+# ابزار انتقال
 # ─────────────────────────────────────────────
 def extract_target_from_message(message, parts_offset: int) -> tuple[int | None, str | None]:
-    """کاربر هدف رو از پیام پیدا می‌کنه.
-
-    روش‌ها:
-    1. ریپلای روی پیام کاربر → از from_user
-    2. ریپلای روی پیامی که متنش آی‌دی عددی هست
-    3. آی‌دی/یوزرنیم توی خود دستور
-    """
+    """کاربر هدف رو از پیام پیدا می‌کنه."""
     # ─── حالت ۱: ریپلای ───
     if message.reply_to_message is not None:
         replied = message.reply_to_message
@@ -857,9 +847,14 @@ def extract_target_from_message(message, parts_offset: int) -> tuple[int | None,
 
 
 async def resolve_target(target_id: int | None, target_username: str | None):
-    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه."""
+    """کاربر رو از آی‌دی یا یوزرنیم پیدا می‌کنه.
+    
+    - اگه با آی‌دی عددی: کاربر اگه نباشه، ساخته می‌شه
+    - اگه با یوزرنیم: باید قبلاً ربات رو استارت کرده باشه
+    """
     if target_id is not None:
-        return await get_user_by_id(target_id)
+        user, _ = await get_or_create_user_by_id(target_id)
+        return user
     if target_username is not None:
         return await get_user_by_username(target_username)
     return None
@@ -869,13 +864,7 @@ async def resolve_target(target_id: int | None, target_username: str | None):
 # انتقال منابع توسط سازنده‌ها (بی‌نهایت)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت.
-
-    روش‌ها:
-    1. انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]
-    2. انتقال [منبع] [تعداد]  + ریپلای روی پیام کاربر
-    3. انتقال [منبع] [تعداد]  + ریپلای روی پیامی که آی‌دی عددی فرستاده
-    """
+    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -934,7 +923,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
 
-    # 🎯 سازنده بی‌نهایت — فقط به گیرنده اضافه می‌شه
     column = RESOURCE_MAP[resource_name]
     receiver_current = getattr(target_user, column)
     receiver_new = receiver_current + amount
@@ -965,12 +953,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت.
-
-    روش‌ها:
-    1. حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]
-    2. حذف انتقال [منبع] [تعداد]  + ریپلای
-    """
+    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1022,7 +1005,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    # 🎯 فقط از گیرنده کم می‌شه — به سازنده اضافه نمی‌شه
     column = RESOURCE_MAP[resource_name]
     receiver_current = getattr(target_user, column)
     receiver_new = receiver_current - amount
@@ -1053,6 +1035,43 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
 
 
 # ─────────────────────────────────────────────
+# خروج از گروه (فقط سازنده‌ها)
+# ─────────────────────────────────────────────
+async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """دستور خروج — ربات از گروه لفت می‌ده.
+    
+    فقط سازنده‌ها می‌تونن از این دستور استفاده کنن.
+    """
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if user.id not in ADMIN_IDS:
+        return
+
+    if chat is None or chat.type not in ("group", "supergroup"):
+        return
+
+    try:
+        await update.message.reply_text(
+            "👋 <b>خداحافظ!</b>\n\n"
+            "از طرف سازنده‌ها، ربات داره از این گروه می‌ره.\n"
+            "اگه دوباره خواستی، ربات رو به گروه اضافه کن. 🌹",
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as exc:
+        logger.exception("Send goodbye error: %s", exc)
+
+    try:
+        await context.bot.leave_chat(chat_id=chat.id)
+        logger.info(f"Left group {chat.id} ({chat.title}) by admin {user.id}")
+    except Exception as exc:
+        logger.exception("leave_chat error: %s", exc)
+
+
+# ─────────────────────────────────────────────
 # کلمات کلیدی و دستورات متنی
 # ─────────────────────────────────────────────
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1078,6 +1097,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     if text.startswith("پرت سیفید"):
         await transfer_shield_handler(update, context)
+        return
+
+    # 🆕 خروج از گروه (فقط سازنده‌ها)
+    if text == "خروج":
+        if user.id not in ADMIN_IDS:
+            return
+        await leave_group_handler(update, context)
         return
 
     # حمله
