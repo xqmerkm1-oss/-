@@ -38,7 +38,7 @@ class User(Base):
     workers: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     lords: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
-    # 🆕 گرسنگی
+    # گرسنگی
     hungry_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_fed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
