@@ -14,6 +14,7 @@ RESOURCE_MAP = {
     "گوشت": "meat",
     "چای": "tea",
     "آجر": "bricks",
+    "اجر": "bricks",  # 🆕 با ا هم کار می‌کنه
     "نون بربری": "bread_count",
     "کیک یزدی": "cake",
     "سیفید": "shields",
@@ -156,29 +157,29 @@ async def update_resources(
             return None
 
         if meat is not None:
-            user.meat = max(0, meat)
+            user.meat = meat
         if tea is not None:
-            user.tea = max(0, tea)
+            user.tea = tea
         if bricks is not None:
-            user.bricks = max(0, bricks)
+            user.bricks = bricks
         if bread_count is not None:
-            user.bread_count = max(0, bread_count)
+            user.bread_count = bread_count
         if cake is not None:
-            user.cake = max(0, cake)
+            user.cake = cake
         if shields is not None:
-            user.shields = max(0, shields)
+            user.shields = shields
         if workers is not None:
-            user.workers = max(0, workers)
+            user.workers = workers
         if lords is not None:
-            user.lords = max(0, lords)
+            user.lords = lords
         if pad_rose is not None:
-            user.pad_rose = max(0, pad_rose)
+            user.pad_rose = pad_rose
         if pad_girl is not None:
-            user.pad_girl = max(0, pad_girl)
+            user.pad_girl = pad_girl
         if pad_boy is not None:
-            user.pad_boy = max(0, pad_boy)
+            user.pad_boy = pad_boy
         if pad_candle is not None:
-            user.pad_candle = max(0, pad_candle)
+            user.pad_candle = pad_candle
 
         await session.commit()
         await session.refresh(user)
@@ -206,10 +207,6 @@ async def transfer_shields(from_id: int, to_id: int, amount: int) -> bool:
 async def transfer_resource(
     from_id: int, to_id: int, resource_name: str, amount: int
 ) -> tuple[bool, int, int]:
-    """منبع رو از یه کاربر به کاربر دیگه منتقل می‌کنه.
-
-    مقدار برگشتی: (موفق؟, مقدار جدید فرستنده, مقدار جدید گیرنده)
-    """
     column = RESOURCE_MAP.get(resource_name)
     if column is None:
         return False, 0, 0
