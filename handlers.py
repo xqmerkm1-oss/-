@@ -163,6 +163,82 @@ def format_user_profile(db_user, remaining: int) -> str:
 
 
 # ─────────────────────────────────────────────
+# خرید در حال انجام (بعد از ارسال عدد توسط کاربر)
+# ─────────────────────────────────────────────
+async def process_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: int) -> None:
+    """مرحله دوم خرید: کاربر عدد فرستاد."""
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+    buying = context.user_data.get("buying")
+    if buying is None:
+        return
+
+    if amount < 1 or amount > 1000:
+        await update.message.reply_text(
+            "❌ عدد باید بین <b>۱</b> تا <b>۱۰۰۰</b> باشه!\n\nدوباره بفرست:",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    item = buying["item"]
+    price_per = buying["price_per"]
+    price_resource = buying["price_resource"]
+    price_name = buying["price_name"]
+    total_price = amount * price_per
+
+    try:
+        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        return
+
+    user_balance = getattr(db_user, price_resource)
+
+    if user_balance < total_price:
+        context.user_data.pop("buying", None)
+        await update.message.reply_text(
+            f"❌ <b>موجودی کافی نداری!</b>\n\n"
+            f"🛒 تعداد درخواستی: <b>{amount:,}</b>\n"
+            f"💰 هزینه کل: <b>{total_price:,} {price_name}</b>\n"
+            f"💼 موجودی تو: <b>{user_balance:,} {price_name}</b>\n\n"
+            f"📉 <b>{total_price - user_balance:,} {price_name}</b> دیگه لازم داری.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    buying["amount"] = amount
+    buying["total_price"] = total_price
+    context.user_data["buying"] = buying
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ مطمئنم، بخر", callback_data="confirm_buy", style="success"),
+            InlineKeyboardButton("❌ لغو", callback_data="cancel_buy", style="danger"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    item_names = {
+        "worker": "کارگر افغانی 🔪",
+        "lord": "لر 🛡️",
+        "cake": "کیک یزدی 🍰",
+    }
+    item_name = item_names.get(item, item)
+
+    await update.message.reply_text(
+        f"🛒 <b>تایید خرید</b>\n\n"
+        f"📦 آیتم: <b>{item_name}</b>\n"
+        f"🔢 تعداد: <b>{amount:,}</b>\n"
+        f"💰 هزینه کل: <b>{total_price:,} {price_name}</b>\n\n"
+        f"آیا از خرید مطمئنی؟",
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+    )
+
+
+# ─────────────────────────────────────────────
 # /start
 # ─────────────────────────────────────────────
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -306,6 +382,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     data = query.data
 
+    # ─── بازگشت ───
     if data == "menu_back":
         await query.edit_message_text(
             START_TEXT,
@@ -315,6 +392,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
+    # ─── بستن پنل ───
     if data == "menu_close":
         try:
             await query.message.delete()
@@ -322,6 +400,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
+    # ─── راهنما ───
     if data == "help_short":
         await query.edit_message_text(
             HELP_SHORT_TEXT,
@@ -391,62 +470,72 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── خرید کارگر افغانی ───
+    # ─── شروع خرید کارگر افغانی ───
     if data == "shop_buy_worker":
-        try:
-            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
-        except Exception as exc:
-            logger.exception("DB error: %s", exc)
-            await query.answer("❌ خطا", show_alert=True)
-            return
-
-        if db_user.bread_count < 100:
-            await query.answer(
-                f"❌ موجودی کافی نداری!\n\n"
-                f"🥖 نیاز: ۱۰۰ نون بربری\n"
-                f"💰 موجودی تو: {db_user.bread_count:,}\n\n"
-                f"📉 {100 - db_user.bread_count:,} نون بربری دیگه لازم داری.",
-                show_alert=True,
-            )
-            return
-
-        await update_resources(
-            user.id,
-            bread_count=db_user.bread_count - 100,
-            workers=db_user.workers + 1,
+        context.user_data["buying"] = {
+            "item": "worker",
+            "price_per": 100,
+            "price_resource": "bread_count",
+            "price_name": "🥖 نون بربری",
+        }
+        await query.edit_message_text(
+            "🔪 <b>خرید کارگر افغانی</b>\n\n"
+            "💰 هزینه هر کارگر: <b>۱۰۰ نون بربری</b>\n\n"
+            "📝 چند تا کارگر افغانی می‌خوای بخری؟\n"
+            "یه عدد بین ۱ تا ۱۰۰۰ بفرست:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
         )
-        await query.answer("✅ یه کارگر افغانی خریدی!", show_alert=True)
         return
 
-    # ─── خرید لر ───
+    # ─── شروع خرید لر ───
     if data == "shop_buy_lord":
-        try:
-            db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
-        except Exception as exc:
-            logger.exception("DB error: %s", exc)
-            await query.answer("❌ خطا", show_alert=True)
-            return
-
-        if db_user.bricks < 50:
-            await query.answer(
-                f"❌ موجودی کافی نداری!\n\n"
-                f"🧱 نیاز: ۵۰ آجر\n"
-                f"💰 موجودی تو: {db_user.bricks:,}\n\n"
-                f"📉 {50 - db_user.bricks:,} آجر دیگه لازم داری.",
-                show_alert=True,
-            )
-            return
-
-        await update_resources(
-            user.id,
-            bricks=db_user.bricks - 50,
-            lords=db_user.lords + 1,
+        context.user_data["buying"] = {
+            "item": "lord",
+            "price_per": 50,
+            "price_resource": "bricks",
+            "price_name": "🧱 آجر",
+        }
+        await query.edit_message_text(
+            "🛡️ <b>خرید لر</b>\n\n"
+            "💰 هزینه هر لر: <b>۵۰ آجر</b>\n\n"
+            "📝 چند تا لر می‌خوای بخری؟\n"
+            "یه عدد بین ۱ تا ۱۰۰۰ بفرست:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
         )
-        await query.answer("✅ یه لر خریدی!", show_alert=True)
         return
 
-    # ─── خرید کیک یزدی ───
+    # ─── شروع خرید کیک یزدی ───
     if data == "shop_buy_cake":
+        context.user_data["buying"] = {
+            "item": "cake",
+            "price_per": 10,
+            "price_resource": "bread_count",
+            "price_name": "🥖 نون بربری",
+        }
+        await query.edit_message_text(
+            "🍰 <b>خرید کیک یزدی</b>\n\n"
+            "💰 هزینه هر کیک: <b>۱۰ نون بربری</b>\n\n"
+            "📝 چند تا کیک یزدی می‌خوای بخری؟\n"
+            "یه عدد بین ۱ تا ۱۰۰۰ بفرست:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
+        )
+        return
+
+    # ─── تایید خرید ───
+    if data == "confirm_buy":
+        buying = context.user_data.get("buying")
+        if buying is None or "amount" not in buying:
+            await query.answer("❌ خطا در خرید", show_alert=True)
+            return
+
+        item = buying["item"]
+        amount = buying["amount"]
+        total_price = buying["total_price"]
+        price_resource = buying["price_resource"]
+
         try:
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
@@ -454,22 +543,69 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("❌ خطا", show_alert=True)
             return
 
-        if db_user.bread_count < 10:
-            await query.answer(
-                f"❌ موجودی کافی نداری!\n\n"
-                f"🥖 نیاز: ۱۰ نون بربری\n"
-                f"💰 موجودی تو: {db_user.bread_count:,}\n\n"
-                f"📉 {10 - db_user.bread_count:,} نون بربری دیگه لازم داری.",
-                show_alert=True,
+        user_balance = getattr(db_user, price_resource)
+        if user_balance < total_price:
+            context.user_data.pop("buying", None)
+            await query.edit_message_text(
+                f"❌ <b>موجودی کافی نداری!</b>\n\n"
+                f"💰 هزینه کل: <b>{total_price:,}</b>\n"
+                f"💼 موجودی تو: <b>{user_balance:,}</b>",
+                parse_mode=ParseMode.HTML,
             )
             return
 
-        await update_resources(
-            user.id,
-            bread_count=db_user.bread_count - 10,
-            cake=db_user.cake + 1,
+        if item == "worker":
+            await update_resources(
+                user.id,
+                bread_count=db_user.bread_count - total_price,
+                workers=db_user.workers + amount,
+            )
+            msg = (
+                f"✅ <b>{amount:,} کارگر افغانی</b> خریدی!\n\n"
+                f"💰 <b>{total_price:,} نون بربری</b> کم شد.\n"
+                f"🔪 موجودی جدید: <b>{db_user.workers + amount:,}</b>"
+            )
+        elif item == "lord":
+            await update_resources(
+                user.id,
+                bricks=db_user.bricks - total_price,
+                lords=db_user.lords + amount,
+            )
+            msg = (
+                f"✅ <b>{amount:,} لر</b> خریدی!\n\n"
+                f"💰 <b>{total_price:,} آجر</b> کم شد.\n"
+                f"🛡️ موجودی جدید: <b>{db_user.lords + amount:,}</b>"
+            )
+        elif item == "cake":
+            await update_resources(
+                user.id,
+                bread_count=db_user.bread_count - total_price,
+                cake=db_user.cake + amount,
+            )
+            msg = (
+                f"✅ <b>{amount:,} کیک یزدی</b> خریدی!\n\n"
+                f"💰 <b>{total_price:,} نون بربری</b> کم شد.\n"
+                f"🍰 موجودی جدید: <b>{db_user.cake + amount:,}</b>"
+            )
+        else:
+            msg = "❌ خطا"
+
+        context.user_data.pop("buying", None)
+
+        await query.edit_message_text(
+            msg,
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_keyboard(),
         )
-        await query.answer("✅ یه کیک یزدی خریدی!", show_alert=True)
+        return
+
+    # ─── لغو خرید ───
+    if data == "cancel_buy":
+        context.user_data.pop("buying", None)
+        await query.edit_message_text(
+            "❌ خرید لغو شد.",
+            reply_markup=back_keyboard(),
+        )
         return
 
     # ─── برترها ───
@@ -821,21 +957,17 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
 # ─────────────────────────────────────────────
 def extract_target_from_message(message, parts_offset: int) -> tuple[int | None, str | None]:
     """کاربر هدف رو از پیام پیدا می‌کنه."""
-    # ─── حالت ۱: ریپلای ───
     if message.reply_to_message is not None:
         replied = message.reply_to_message
 
-        # ۱.۱: ریپلای روی پیام کاربر
         if replied.from_user is not None and not replied.from_user.is_bot:
             return replied.from_user.id, None
 
-        # ۱.۲: ریپلای روی پیامی که متنش آی‌دی عددیه
         if replied.text:
             replied_text = replied.text.strip()
             if replied_text.isdigit():
                 return int(replied_text), None
 
-    # ─── حالت ۲: آی‌دی/یوزرنیم توی خود دستور ───
     parts = message.text.split()
     if len(parts) > parts_offset:
         target_str = parts[parts_offset]
@@ -861,7 +993,6 @@ async def resolve_target(target_id: int | None, target_username: str | None):
 # انتقال منابع توسط سازنده‌ها (بی‌نهایت)
 # ─────────────────────────────────────────────
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -886,7 +1017,50 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
 
-    resource_name = parts[1]
+    # 🎯 پیدا کردن منبع (چند کلمه‌ای یا تک کلمه)
+    resource_name = None
+    amount = None
+    target_offset = None
+
+    # حالت ۱: منابع دو کلمه‌ای
+    two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
+    two_word_found = False
+    for res in two_word_resources:
+        res_parts = res.split()
+        if len(parts) >= 2 + len(res_parts):
+            # چک کن که parts[1:1+len(res_parts)] با res_parts یکی هست
+            if parts[1:1 + len(res_parts)] == res_parts:
+                resource_name = res
+                try:
+                    amount = int(parts[1 + len(res_parts)])
+                    target_offset = 2 + len(res_parts)
+                    two_word_found = True
+                except (ValueError, IndexError):
+                    pass
+                break
+
+    # حالت ۲: منابع تک کلمه‌ای
+    if not two_word_found and len(parts) >= 3:
+        resource_name = parts[1]
+        try:
+            amount = int(parts[2])
+            target_offset = 3
+        except ValueError:
+            pass
+
+    if resource_name is None or amount is None:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
+            "یا\n"
+            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
+            "📋 منابع قابل انتقال:\n"
+            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
+            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب، شمع",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
     if resource_name not in RESOURCE_MAP:
         await update.message.reply_text(
             f"❌ منبع <b>{resource_name}</b> شناخته نشد!\n\n"
@@ -897,15 +1071,11 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
 
-    try:
-        amount = int(parts[2])
-        if amount <= 0:
-            raise ValueError
-    except ValueError:
+    if amount <= 0:
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_id, target_username = extract_target_from_message(update.message, 3)
+    target_id, target_username = extract_target_from_message(update.message, target_offset)
     target_user = await resolve_target(target_id, target_username)
 
     if target_user is None:
@@ -914,8 +1084,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             "📋 روش‌های درست:\n"
             "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
             "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
-            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر\n"
-            "4️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیامی که آی‌دی عددی نوشته",
+            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -950,7 +1119,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """حذف انتقال هر منبعی توسط سازنده‌ها — بی‌نهایت."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -972,7 +1140,42 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    resource_name = parts[2]
+    # 🎯 پیدا کردن منبع (چند کلمه‌ای یا تک کلمه)
+    resource_name = None
+    amount = None
+    target_offset = None
+
+    two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
+    two_word_found = False
+    for res in two_word_resources:
+        res_parts = res.split()
+        if len(parts) >= 2 + len(res_parts):
+            if parts[2:2 + len(res_parts)] == res_parts:
+                resource_name = res
+                try:
+                    amount = int(parts[2 + len(res_parts)])
+                    target_offset = 3 + len(res_parts)
+                    two_word_found = True
+                except (ValueError, IndexError):
+                    pass
+                break
+
+    if not two_word_found and len(parts) >= 4:
+        resource_name = parts[2]
+        try:
+            amount = int(parts[3])
+            target_offset = 4
+        except ValueError:
+            pass
+
+    if resource_name is None or amount is None:
+        await update.message.reply_text(
+            "❌ فرمت درست:\n"
+            "<code>حذف انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
     if resource_name not in RESOURCE_MAP:
         await update.message.reply_text(
             f"❌ منبع <b>{resource_name}</b> شناخته نشد!",
@@ -980,15 +1183,11 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
-    try:
-        amount = int(parts[3])
-        if amount <= 0:
-            raise ValueError
-    except ValueError:
+    if amount <= 0:
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_id, target_username = extract_target_from_message(update.message, 4)
+    target_id, target_username = extract_target_from_message(update.message, target_offset)
     target_user = await resolve_target(target_id, target_username)
 
     if target_user is None:
@@ -1035,7 +1234,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
 # خروج از گروه (فقط سازنده‌ها)
 # ─────────────────────────────────────────────
 async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """دستور خروج — ربات از گروه لفت می‌ده."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -1075,6 +1273,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text = update.message.text.strip()
     user = update.effective_user
     if user is None:
+        return
+
+    # 🎯 خرید در حال انجام (کاربر عدد فرستاد)
+    buying = context.user_data.get("buying")
+    if buying is not None and "amount" not in buying and text.isdigit():
+        await process_buy_amount(update, context, int(text))
         return
 
     if text == CMD_HELP:
