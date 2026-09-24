@@ -45,7 +45,6 @@ def back_keyboard() -> InlineKeyboardMarkup:
 
 
 def help_keyboard() -> InlineKeyboardMarkup:
-    """دکمه‌های راهنمای اصلی (سه دکمه)."""
     keyboard = [
         [
             _btn("📘 توضیحات کوتاه", callback_data="help_short", style="primary"),
@@ -59,7 +58,6 @@ def help_keyboard() -> InlineKeyboardMarkup:
 
 
 def help_back_keyboard() -> InlineKeyboardMarkup:
-    """دکمه بازگشت به راهنمای اصلی."""
     keyboard = [
         [
             _btn("🔙 بازگشت به راهنما", callback_data="help_back", style="primary"),
@@ -75,15 +73,5 @@ def shop_keyboard() -> InlineKeyboardMarkup:
         [_btn("🛡️ خرید لر (۵۰ 🧱)", callback_data="shop_buy_lord", style="primary")],
         [_btn("🍰 خرید کیک یزدی (۱۰ 🥖)", callback_data="shop_buy_cake", style="primary")],
         [_btn("🔙 بازگشت", callback_data="menu_back", style="danger")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def attack_keyboard(target_id: int) -> InlineKeyboardMarkup:
-    keyboard = [
-        [
-            _btn("⚔️ تایید حمله", callback_data=f"attack_confirm_{target_id}", style="danger"),
-            _btn("❌ لغو", callback_data="attack_cancel", style="success"),
-        ],
     ]
     return InlineKeyboardMarkup(keyboard)
