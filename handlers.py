@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -50,11 +51,9 @@ INVITED_REWARD = 250
 # 🎯 سازنده‌های ربات
 ADMIN_IDS = [7803165903, 1844792522]
 
-# 🎯 منطقه‌ی زمانی تهران
 TEHRAN_TZ = ZoneInfo("Asia/Tehran")
 
 
-# 🎯 کلمات کلیدی (شمع حذف شد)
 KEYWORDS: dict[str, tuple[int, int]] = {
     "گل رز": (2, 0),
     "دختر خوب": (5, 500),
@@ -66,7 +65,6 @@ KEYWORDS: dict[str, tuple[int, int]] = {
     "شومپد": (10, 20000),
 }
 
-# 🎯 نقشه کلمه کلیدی به ستون منبع خاص
 KEYWORD_RESOURCE = {
     "گل رز": "pad_rose",
     "دختر خوب": "pad_girl",
@@ -84,40 +82,35 @@ CMD_TOP = "برترها"
 CMD_RESOURCES = "منابع"
 
 
+# ═════════════════════════════════════════════
+# ابزار عمومی
+# ═════════════════════════════════════════════
 async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         status = member.status
-        if status in ("member", "administrator", "creator"):
-            return True
-        return False
+        return status in ("member", "administrator", "creator")
     except Exception as exc:
         logger.exception("get_chat_member error: %s", exc)
         return True
 
 
 def join_keyboard() -> InlineKeyboardMarkup:
-    keyboard = [
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK, style="primary")],
         [InlineKeyboardButton("✅ عضو شدم", callback_data="check_membership", style="success")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
+    ])
 
 
 def invite_keyboard(invite_link: str) -> InlineKeyboardMarkup:
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "📤 اشتراک‌گذاری لینک",
-                url=f"https://t.me/share/url?url={invite_link}&text=بیا توی شومپد بازی کنیم!",
-                style="primary",
-            )
-        ],
-        [
-            InlineKeyboardButton("🔙 بازگشت", callback_data="menu_back", style="danger"),
-        ],
-    ]
-    return InlineKeyboardMarkup(keyboard)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "📤 اشتراک‌گذاری لینک",
+            url=f"https://t.me/share/url?url={invite_link}&text=بیا توی شومپد بازی کنیم!",
+            style="primary",
+        )],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu_back", style="danger")],
+    ])
 
 
 def format_user_profile(db_user, remaining: int) -> str:
@@ -161,9 +154,9 @@ def format_user_profile(db_user, remaining: int) -> str:
     )
 
 
-# ─────────────────────────────────────────────
-# خرید در حال انجام
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# خرید
+# ═════════════════════════════════════════════
 async def process_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: int) -> None:
     if update.message is None or update.effective_user is None:
         return
@@ -210,35 +203,31 @@ async def process_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE,
     buying["total_price"] = total_price
     context.user_data["buying"] = buying
 
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ مطمئنم، بخر", callback_data="confirm_buy", style="success"),
-            InlineKeyboardButton("❌ لغو", callback_data="cancel_buy", style="danger"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [[
+        InlineKeyboardButton("✅ مطمئنم، بخر", callback_data="confirm_buy", style="success"),
+        InlineKeyboardButton("❌ لغو", callback_data="cancel_buy", style="danger"),
+    ]]
 
     item_names = {
         "worker": "کارگر افغانی 🔪",
         "lord": "لر 🛡️",
         "cake": "کیک یزدی 🍰",
     }
-    item_name = item_names.get(item, item)
 
     await update.message.reply_text(
         f"🛒 <b>تایید خرید</b>\n\n"
-        f"📦 آیتم: <b>{item_name}</b>\n"
+        f"📦 آیتم: <b>{item_names.get(item, item)}</b>\n"
         f"🔢 تعداد: <b>{amount:,}</b>\n"
         f"💰 هزینه کل: <b>{total_price:,} {price_name}</b>\n\n"
         f"آیا از خرید مطمئنی؟",
         parse_mode=ParseMode.HTML,
-        reply_markup=reply_markup,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
 # /start
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if user is None or update.message is None:
@@ -320,12 +309,10 @@ async def process_invite(update, context, inviter_id: int, new_user) -> None:
         logger.exception("process_invite error: %s", exc)
 
 
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
 # عضویت اجباری
-# ─────────────────────────────────────────────
-async def check_membership_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+# ═════════════════════════════════════════════
+async def check_membership_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None:
         return
@@ -365,9 +352,9 @@ async def check_membership_callback(
     )
 
 
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
 # دکمه‌های منو
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None:
@@ -390,7 +377,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بستن پنل ───
     if data == "menu_close":
         try:
             await query.message.delete()
@@ -432,17 +418,13 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
-            await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
+            await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
             return
 
         remaining = seconds_remaining(db_user)
         text = format_user_profile(db_user, remaining)
 
-        await query.edit_message_text(
-            text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=back_keyboard(),
-        )
+        await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
     # ─── فروشگاه ───
@@ -451,7 +433,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
         except Exception as exc:
             logger.exception("DB error: %s", exc)
-            await query.edit_message_text("❌ خطا در دریافت اطلاعات.", reply_markup=back_keyboard())
+            await query.edit_message_text("❌ خطا", reply_markup=back_keyboard())
             return
 
         await query.edit_message_text(
@@ -468,7 +450,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── شروع خرید کارگر افغانی ───
     if data == "shop_buy_worker":
         context.user_data["buying"] = {
             "item": "worker",
@@ -486,7 +467,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── شروع خرید لر ───
     if data == "shop_buy_lord":
         context.user_data["buying"] = {
             "item": "lord",
@@ -504,7 +484,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── شروع خرید کیک یزدی ───
     if data == "shop_buy_cake":
         context.user_data["buying"] = {
             "item": "cake",
@@ -590,20 +569,84 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         context.user_data.pop("buying", None)
 
+        await query.edit_message_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
+        return
+
+    if data == "cancel_buy":
+        context.user_data.pop("buying", None)
+        await query.edit_message_text("❌ خرید لغو شد.", reply_markup=back_keyboard())
+        return
+
+    # ─── ثبت درخواست حمله ───
+    if data.startswith("war_request_"):
+        try:
+            target_id = int(data.replace("war_request_", ""))
+        except ValueError:
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        try:
+            attacker, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if attacker.workers < 1:
+            await query.answer("❌ کارگر افغانی نداری! از فروشگاه بخر.", show_alert=True)
+            return
+
+        target_user = await get_user_by_id(target_id)
+        if target_user is None:
+            await query.answer("❌ حریف پیدا نشد!", show_alert=True)
+            return
+
+        target_name = target_user.first_name or target_user.username or "کاربر"
+
+        # ذخیره توی context
+        context.user_data["war"] = {
+            "attacker_id": user.id,
+            "target_id": target_id,
+        }
+
+        keyboard = [[
+            InlineKeyboardButton("⚔️ تایید جنگ نهایی", callback_data="war_confirm", style="danger"),
+            InlineKeyboardButton("❌ انصراف", callback_data="war_cancel", style="success"),
+        ]]
+
         await query.edit_message_text(
-            msg,
+            f"📢 <b>درخواست حمله!</b>\n\n"
+            f"⚔️ حمله‌کننده: <b>{attacker.first_name}</b>\n"
+            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"🔪 کارگرهای افغانی حمله‌کننده: <b>{attacker.workers:,}</b>\n"
+            f"🛡️ لرهای هدف: <b>{target_user.lords:,}</b>\n"
+            f"🧱 آجرهای هدف: <b>{target_user.bricks:,}</b>\n\n"
+            f"⚠️ آیا از حمله مطمئنی؟\n"
+            f"با تایید، جنگ شروع می‌شه.",
             parse_mode=ParseMode.HTML,
-            reply_markup=back_keyboard(),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
         return
 
-    # ─── لغو خرید ───
-    if data == "cancel_buy":
-        context.user_data.pop("buying", None)
-        await query.edit_message_text(
-            "❌ خرید لغو شد.",
-            reply_markup=back_keyboard(),
-        )
+    # ─── لغو حمله ───
+    if data == "war_cancel":
+        context.user_data.pop("war", None)
+        await query.edit_message_text("❌ حمله لغو شد.", reply_markup=back_keyboard())
+        return
+
+    # ─── تایید و اجرای جنگ ───
+    if data == "war_confirm":
+        war = context.user_data.get("war")
+        if war is None:
+            await query.answer("❌ خطا در جنگ", show_alert=True)
+            return
+
+        if user.id != war["attacker_id"]:
+            await query.answer("❌ فقط حمله‌کننده می‌تونه تایید کنه!", show_alert=True)
+            return
+
+        context.user_data.pop("war", None)
+        await execute_war(update, context, war)
         return
 
     # ─── برترها ───
@@ -625,11 +668,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             name = u.first_name or u.username or f"کاربر {u.telegram_id}"
             lines.append(f"{medals[i]} <b>{name}</b> — {u.pads:,} پد")
 
-        await query.edit_message_text(
-            "\n".join(lines),
-            parse_mode=ParseMode.HTML,
-            reply_markup=back_keyboard(),
-        )
+        await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
     # ─── دعوت دوستان ───
@@ -659,9 +698,151 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
 
-# ─────────────────────────────────────────────
-# راهنما، پروفایل، برترها، منابع
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# اجرای جنگ (نمایش لحظه‌ای)
+# ═════════════════════════════════════════════
+async def execute_war(update, context, war: dict) -> None:
+    query = update.callback_query
+
+    attacker_id = war["attacker_id"]
+    target_id = war["target_id"]
+
+    try:
+        attacker = await get_user_by_id(attacker_id)
+        target = await get_user_by_id(target_id)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        await query.edit_message_text("❌ خطا در جنگ", reply_markup=back_keyboard())
+        return
+
+    if attacker is None or target is None:
+        await query.edit_message_text("❌ کاربر پیدا نشد", reply_markup=back_keyboard())
+        return
+
+    attacker_name = attacker.first_name or "کاربر"
+    target_name = target.first_name or "کاربر"
+
+    worker_count = attacker.workers
+
+    if worker_count < 1:
+        await query.edit_message_text("❌ کارگر افغانی نداری!", reply_markup=back_keyboard())
+        return
+
+    # ─── مرحله ۱: شروع ───
+    await query.edit_message_text(
+        f"⚔️ <b>جنگ شروع شد!</b>\n\n"
+        f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
+        f"🎯 هدف: <b>{target_name}</b>\n\n"
+        f"🛡️ لرهای مدافع: <b>{target.lords:,}</b>\n"
+        f"🧱 آجرهای مدافع: <b>{target.bricks:,}</b>\n\n"
+        f"⏳ در حال نبرد...",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(2)
+
+    # ─── مرحله ۲: رسیدن کارگرها ───
+    await query.edit_message_text(
+        f"⚔️ <b>جنگ در جریانه!</b>\n\n"
+        f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
+        f"🎯 هدف: <b>{target_name}</b>\n\n"
+        f"🔪 کارگرهای افغانی دارن می‌رسن...\n"
+        f"🛡️ <b>{target.lords:,} لر</b> آماده‌ی دفاع شدن!\n\n"
+        f"⏳ در حال نبرد...",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(2)
+
+    # ─── محاسبه نتیجه ───
+    available_lords = min(target.lords, target.bricks)
+    workers_killed = available_lords * 4
+    remaining_workers = max(0, worker_count - workers_killed)
+
+    if available_lords == 0:
+        remaining_workers = worker_count
+        attacker_new_workers = attacker.workers
+    else:
+        attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
+        if attacker_new_workers < 0:
+            attacker_new_workers = 0
+
+    stolen_tea = remaining_workers * 3
+    stolen_meat = remaining_workers * 1
+    stolen_tea = min(stolen_tea, target.tea)
+    stolen_meat = min(stolen_meat, target.meat)
+
+    # ─── مرحله ۳: نمایش دفاع ───
+    battle_lines = [
+        f"⚔️ <b>نبرد در جریان!</b>\n",
+        f"👤 حمله‌کننده: <b>{attacker_name}</b>",
+        f"🎯 هدف: <b>{target_name}</b>\n",
+    ]
+
+    if available_lords > 0:
+        battle_lines.append(f"🛡️ <b>{available_lords:,} لر</b> از {target_name} دفاع کردن!")
+        battle_lines.append(f"💀 <b>{worker_count - remaining_workers:,} کارگر</b> کشته شدن!")
+        battle_lines.append(f"🧱 <b>{available_lords:,} آجر</b> مصرف شد!\n")
+    else:
+        battle_lines.append(f"⚠️ {target_name} هیچ لر یا آجری برای دفاع نداشت!\n")
+
+    battle_lines.append(f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>")
+    battle_lines.append(f"⏳ در حال محاسبه‌ی نتیجه...")
+
+    await query.edit_message_text("\n".join(battle_lines), parse_mode=ParseMode.HTML)
+    await asyncio.sleep(2)
+
+    # ─── به‌روزرسانی دیتابیس ───
+    await update_resources(
+        attacker_id,
+        workers=attacker_new_workers,
+        tea=attacker.tea + stolen_tea,
+        meat=attacker.meat + stolen_meat,
+    )
+
+    await update_resources(
+        target_id,
+        lords=target.lords - available_lords,
+        bricks=target.bricks - available_lords,
+        tea=target.tea - stolen_tea,
+        meat=target.meat - stolen_meat,
+    )
+
+    # ─── مرحله ۴: نتیجه نهایی ───
+    if remaining_workers > 0:
+        result = (
+            f"🎉 <b>جنگ تموم شد!</b>\n"
+            f"🏆 <b>{attacker_name}</b> برنده شد!\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
+            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
+            f"💀 کارگرهای کشته‌شده: <b>{worker_count - remaining_workers:,}</b>\n"
+            f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>\n\n"
+            f"🛡️ لرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
+            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n\n"
+            f"🎁 <b>غنیمت:</b>\n"
+            f"🥩 گوشت: <b>+{stolen_meat:,}</b>\n"
+            f"🍵 چای: <b>+{stolen_tea:,}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+    else:
+        result = (
+            f"💥 <b>حمله شکست خورد!</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
+            f"🎯 هدف: <b>{target_name}</b>\n\n"
+            f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
+            f"💀 همه‌ی کارگرها کشته شدن! 🪦\n\n"
+            f"🛡️ لرهای دفاعی هدف: <b>{available_lords:,}</b>\n"
+            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+
+    await query.edit_message_text(result, parse_mode=ParseMode.HTML)
+
+
+# ═════════════════════════════════════════════
+# دستورات متنی
+# ═════════════════════════════════════════════
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -686,7 +867,6 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     remaining = seconds_remaining(db_user)
     text = format_user_profile(db_user, remaining)
-
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
@@ -742,18 +922,16 @@ async def resources_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
 
-# ─────────────────────────────────────────────
-# حمله
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# حمله با ریپلای
+# ═════════════════════════════════════════════
 async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """حمله.
     
-    فرمت‌ها:
-    - حمله 100 کارگر افغانی → ۱۰۰ کارگر
-    - حمله 100 افغانی → ۱۰۰ کارگر
-    - حمله افغانی‌ها → همه کارگرها
-    - حمله → همه کارگرها
-    - با ریپلای روی پیام حریف
+    روش‌ها:
+    - حمله (با ریپلای)
+    - حمله @user (با ریپلای)
+    - حمله 123456789 (با ریپلای)
     """
     if update.message is None or update.effective_user is None:
         return
@@ -777,11 +955,13 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # ─── پیدا کردن حریف ───
     target_user = None
 
+    # ۱. ریپلای روی پیام کاربر
     if update.message.reply_to_message is not None:
         replied = update.message.reply_to_message
         if replied.from_user is not None and not replied.from_user.is_bot:
             target_user = await get_user_by_id(replied.from_user.id)
 
+    # ۲. اگه ریپلای نبود، توی متن بگرد
     if target_user is None:
         parts = text.split()
         for part in parts[1:]:
@@ -801,11 +981,9 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(
             "❌ حریف پیدا نشد!\n\n"
             "📋 روش‌های درست:\n"
-            "1️⃣ روی پیام کاربر <b>ریپلای</b> کن و بنویس:\n"
-            "<code>حمله 100 افغانی</code>\n\n"
-            "2️⃣ یا با آی‌دی/یوزرنیم:\n"
-            "<code>حمله @ali 100 افغانی</code>\n"
-            "<code>حمله 1844792522 50</code>",
+            "1️⃣ روی پیام کاربر <b>ریپلای</b> کن و بنویس <code>حمله</code>\n"
+            "2️⃣ یا <code>حمله @user</code> با ریپلای\n"
+            "3️⃣ یا <code>حمله 123456789</code> با ریپلای",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -814,91 +992,30 @@ async def attack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ نمی‌تونی به خودت حمله کنی!")
         return
 
-    # ─── پیدا کردن تعداد کارگر ───
-    parts = text.split()
-    worker_count = attacker.workers
-
-    for part in parts[1:]:
-        if part.isdigit():
-            try:
-                count = int(part)
-                if count > 0:
-                    worker_count = min(count, attacker.workers)
-                    break
-            except ValueError:
-                pass
-
-    if worker_count < 1:
-        worker_count = attacker.workers
-
     target_name = target_user.first_name or target_user.username or "کاربر"
 
-    # ─── محاسبه دفاع ───
-    available_lords = min(target_user.lords, target_user.bricks)
-    workers_killed = available_lords * 4
-    remaining_workers = max(0, worker_count - workers_killed)
-
-    if available_lords == 0:
-        remaining_workers = worker_count
-        attacker_new_workers = attacker.workers
-    else:
-        attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
-        if attacker_new_workers < 0:
-            attacker_new_workers = 0
-
-    stolen_tea = remaining_workers * 3
-    stolen_meat = remaining_workers * 1
-
-    stolen_tea = min(stolen_tea, target_user.tea)
-    stolen_meat = min(stolen_meat, target_user.meat)
-
-    await update_resources(
-        user.id,
-        workers=attacker_new_workers,
-        tea=attacker.tea + stolen_tea,
-        meat=attacker.meat + stolen_meat,
-    )
-
-    new_lords = target_user.lords - available_lords
-    new_bricks = target_user.bricks - available_lords
-    new_tea = target_user.tea - stolen_tea
-    new_meat = target_user.meat - stolen_meat
-
-    await update_resources(
-        target_user.telegram_id,
-        lords=new_lords,
-        bricks=new_bricks,
-        tea=new_tea,
-        meat=new_meat,
-    )
-
-    result_lines = [f"⚔️ <b>نتیجه‌ی حمله</b>\n"]
-    result_lines.append(f"👤 حمله‌کننده: <b>{attacker.first_name}</b>")
-    result_lines.append(f"🎯 هدف: <b>{target_name}</b>")
-    result_lines.append(f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>")
-    result_lines.append("")
-
-    if available_lords > 0:
-        result_lines.append(f"🛡️ لرهای دفاعی حریف: <b>{available_lords:,}</b>")
-        result_lines.append(f"💀 کارگرهای کشته‌شده: <b>{worker_count - remaining_workers:,}</b>")
-        result_lines.append(f"🧱 آجر مصرف‌شده: <b>{available_lords:,}</b>")
-
-    result_lines.append(f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>")
-    result_lines.append("")
-
-    if remaining_workers > 0:
-        result_lines.append(f"🎁 <b>دزدی:</b>")
-        result_lines.append(f"🥩 گوشت: <b>+{stolen_meat:,}</b>")
-        result_lines.append(f"🍵 چای: <b>+{stolen_tea:,}</b>")
-    else:
-        result_lines.append(f"💥 <b>حمله شکست خورد!</b>")
+    # ─── پیام درخواست حمله ───
+    keyboard = [[
+        InlineKeyboardButton("📝 ثبت درخواست حمله", callback_data=f"war_request_{target_user.telegram_id}", style="danger"),
+        InlineKeyboardButton("❌ لغو", callback_data="war_cancel", style="success"),
+    ]]
 
     await update.message.reply_text(
-        "\n".join(result_lines),
+        f"⚔️ <b>درخواست حمله</b>\n\n"
+        f"👤 حمله‌کننده: <b>{attacker.first_name}</b>\n"
+        f"🎯 هدف: <b>{target_name}</b>\n\n"
+        f"🔪 کارگرهای افغانی تو: <b>{attacker.workers:,}</b>\n"
+        f"🛡️ لرهای حریف: <b>{target_user.lords:,}</b>\n"
+        f"🧱 آجرهای حریف: <b>{target_user.bricks:,}</b>\n\n"
+        f"⚠️ آیا از حمله مطمئنی؟",
         parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
+# ═════════════════════════════════════════════
+# پرت سیفید
+# ═════════════════════════════════════════════
 async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
         return
@@ -939,8 +1056,7 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
         target_user = await get_user_by_username(target_str)
     else:
         try:
-            target_id = int(target_str)
-            target_user = await get_user_by_id(target_id)
+            target_user = await get_user_by_id(int(target_str))
         except ValueError:
             pass
 
@@ -962,45 +1078,17 @@ async def transfer_shield_handler(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
-# ─────────────────────────────────────────────
-# ابزار انتقال
-# ─────────────────────────────────────────────
-def extract_target_from_message(message, parts_offset: int) -> tuple[int | None, str | None]:
-    if message.reply_to_message is not None:
-        replied = message.reply_to_message
-
-        if replied.from_user is not None and not replied.from_user.is_bot:
-            return replied.from_user.id, None
-
-        if replied.text:
-            replied_text = replied.text.strip()
-            if replied_text.isdigit():
-                return int(replied_text), None
-
-    parts = message.text.split()
-    if len(parts) > parts_offset:
-        target_str = parts[parts_offset]
-        if target_str.startswith("@"):
-            return None, target_str
-        elif target_str.lstrip("-").isdigit():
-            return int(target_str), None
-
-    return None, None
-
-
-async def resolve_target(target_id: int | None, target_username: str | None):
-    if target_id is not None:
-        user, _ = await get_or_create_user_by_id(target_id)
-        return user
-    if target_username is not None:
-        return await get_user_by_username(target_username)
-    return None
-
-
-# ─────────────────────────────────────────────
-# انتقال منابع توسط سازنده‌ها (بی‌نهایت)
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# انتقال توسط سازنده‌ها
+# ═════════════════════════════════════════════
 async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """انتقال منابع توسط سازنده‌ها.
+    
+    فرمت‌ها:
+    - انتقال پد 1000 1844792522
+    - انتقال پد 1000 @ali
+    - انتقال پد 1000  (با ریپلای)
+    """
     if update.message is None or update.effective_user is None:
         return
 
@@ -1017,20 +1105,20 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
             "❌ فرمت درست:\n"
             "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>\n"
             "یا\n"
-            "<code>انتقال [منبع] [تعداد]</code> + ریپلای\n\n"
-            "📋 منابع قابل انتقال:\n"
-            "پد، گوشت، چای، آجر، نون بربری، کیک یزدی، سیفید،\n"
-            "کارگر افغانی، لر، گل رز، دختر خوب، پسر خوب",
+            "<code>انتقال [منبع] [تعداد]</code> + ریپلای",
             parse_mode=ParseMode.HTML,
         )
         return
 
+    # ─── پیدا کردن منبع ───
     resource_name = None
     amount = None
     target_offset = None
 
+    # منابع دو کلمه‌ای
     two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
     two_word_found = False
+
     for res in two_word_resources:
         res_parts = res.split()
         if len(parts) >= 2 + len(res_parts):
@@ -1044,6 +1132,7 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
                     pass
                 break
 
+    # منابع تک کلمه‌ای
     if not two_word_found and len(parts) >= 3:
         resource_name = parts[1]
         try:
@@ -1054,8 +1143,10 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     if resource_name is None or amount is None:
         await update.message.reply_text(
-            "❌ فرمت درست:\n"
-            "<code>انتقال [منبع] [تعداد] [آی‌دی/یوزرنیم]</code>",
+            "❌ فرمت اشتباه!\n\n"
+            "📋 مثال:\n"
+            "<code>انتقال پد 1000 1844792522</code>\n"
+            "<code>انتقال پد 1000</code> + ریپلای",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1074,16 +1165,37 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_id, target_username = extract_target_from_message(update.message, target_offset)
-    target_user = await resolve_target(target_id, target_username)
+    # ─── پیدا کردن هدف ───
+    target_user = None
+
+    # ۱. ریپلای
+    if update.message.reply_to_message is not None:
+        replied = update.message.reply_to_message
+        if replied.from_user is not None and not replied.from_user.is_bot:
+            target_user, _ = await get_or_create_user_by_id(replied.from_user.id)
+        elif replied.text and replied.text.strip().isdigit():
+            target_user, _ = await get_or_create_user_by_id(int(replied.text.strip()))
+
+    # ۲. متن
+    if target_user is None and len(parts) > target_offset:
+        target_str = parts[target_offset]
+        if target_str.startswith("@"):
+            target_user = await get_user_by_username(target_str)
+        elif target_str.lstrip("-").isdigit():
+            target_user, _ = await get_or_create_user_by_id(int(target_str))
 
     if target_user is None:
         await update.message.reply_text(
-            "❌ کاربر پیدا نشد!",
+            "❌ کاربر پیدا نشد!\n\n"
+            "📋 روش‌های درست:\n"
+            "1️⃣ <code>انتقال پد 1000 1844792522</code>\n"
+            "2️⃣ <code>انتقال پد 1000 @ali</code>\n"
+            "3️⃣ <code>انتقال پد 1000</code> + ریپلای روی پیام کاربر",
             parse_mode=ParseMode.HTML,
         )
         return
 
+    # ─── انتقال ───
     column = RESOURCE_MAP[resource_name]
     receiver_current = getattr(target_user, column)
     receiver_new = receiver_current + amount
@@ -1133,12 +1245,14 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         )
         return
 
+    # ─── پیدا کردن منبع ───
     resource_name = None
     amount = None
     target_offset = None
 
     two_word_resources = ["نون بربری", "کیک یزدی", "کارگر افغانی", "گل رز", "دختر خوب", "پسر خوب"]
     two_word_found = False
+
     for res in two_word_resources:
         res_parts = res.split()
         if len(parts) >= 3 + len(res_parts):
@@ -1161,7 +1275,7 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
             pass
 
     if resource_name is None or amount is None:
-        await update.message.reply_text("❌ فرمت درست نیست!", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("❌ فرمت اشتباه!", parse_mode=ParseMode.HTML)
         return
 
     if resource_name not in RESOURCE_MAP:
@@ -1172,8 +1286,22 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         await update.message.reply_text("❌ تعداد باید یه عدد مثبت باشه!")
         return
 
-    target_id, target_username = extract_target_from_message(update.message, target_offset)
-    target_user = await resolve_target(target_id, target_username)
+    # ─── پیدا کردن هدف ───
+    target_user = None
+
+    if update.message.reply_to_message is not None:
+        replied = update.message.reply_to_message
+        if replied.from_user is not None and not replied.from_user.is_bot:
+            target_user, _ = await get_or_create_user_by_id(replied.from_user.id)
+        elif replied.text and replied.text.strip().isdigit():
+            target_user, _ = await get_or_create_user_by_id(int(replied.text.strip()))
+
+    if target_user is None and len(parts) > target_offset:
+        target_str = parts[target_offset]
+        if target_str.startswith("@"):
+            target_user = await get_user_by_username(target_str)
+        elif target_str.lstrip("-").isdigit():
+            target_user, _ = await get_or_create_user_by_id(int(target_str))
 
     if target_user is None:
         await update.message.reply_text("❌ کاربر پیدا نشد!", parse_mode=ParseMode.HTML)
@@ -1208,9 +1336,9 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
         logger.exception("send_message to receiver error: %s", exc)
 
 
-# ─────────────────────────────────────────────
-# خروج از گروه (فقط سازنده‌ها)
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# خروج از گروه
+# ═════════════════════════════════════════════
 async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
         return
@@ -1241,9 +1369,9 @@ async def leave_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.exception("leave_chat error: %s", exc)
 
 
-# ─────────────────────────────────────────────
-# کلمات کلیدی و دستورات متنی
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+# هندلر اصلی متن
+# ═════════════════════════════════════════════
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -1253,12 +1381,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user is None:
         return
 
-    # خرید در حال انجام
+    # خرید
     buying = context.user_data.get("buying")
     if buying is not None and "amount" not in buying and text.isdigit():
         await process_buy_amount(update, context, int(text))
         return
 
+    # دستورات
     if text == CMD_HELP:
         await help_handler(update, context)
         return
@@ -1275,7 +1404,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await transfer_shield_handler(update, context)
         return
 
-    # خروج از گروه
+    # خروج
     if text == "خروج":
         if user.id not in ADMIN_IDS:
             return
