@@ -69,11 +69,12 @@ def help_back_keyboard(owner_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def shop_keyboard() -> InlineKeyboardMarkup:
+def shop_keyboard(owner_id: int) -> InlineKeyboardMarkup:
+    """دکمه‌های فروشگاه — با owner_id برای قفل."""
     keyboard = [
-        [_btn("🔪 خرید کارگر افغانی (۱۰۰ 🥖)", callback_data="shop_buy_worker", style="primary")],
-        [_btn("🛡️ خرید لر (۵۰ 🧱)", callback_data="shop_buy_lord", style="primary")],
-        [_btn("🍰 خرید کیک یزدی (۱۰ 🥖)", callback_data="shop_buy_cake", style="primary")],
-        [_btn("🔙 بازگشت", callback_data="menu_back", style="danger")],
+        [_btn("🔪 خرید کارگر افغانی (۱۰۰ 🥖)", callback_data=f"shop_buy_worker_{owner_id}", style="primary")],
+        [_btn("🛡️ خرید لر (۵۰ 🧱)", callback_data=f"shop_buy_lord_{owner_id}", style="primary")],
+        [_btn("🍰 خرید کیک یزدی (۱۰ 🥖)", callback_data=f"shop_buy_cake_{owner_id}", style="primary")],
+        [_btn("🔙 بستن", callback_data=f"menu_close_{owner_id}", style="danger")],
     ]
     return InlineKeyboardMarkup(keyboard)
