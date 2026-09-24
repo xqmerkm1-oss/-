@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -103,7 +104,6 @@ async def is_user_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
 
 
 async def notify_admins(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
-    """گزارش رو به همه‌ی سازنده‌ها بفرست."""
     for admin_id in ADMIN_IDS:
         try:
             await context.bot.send_message(
@@ -216,7 +216,7 @@ async def check_daily_food(telegram_id: int, update: Update) -> None:
 
 
 # ═════════════════════════════════════════════
-# گزارش اضافه شدن ربات به گروه
+# گزارش گروه
 # ═════════════════════════════════════════════
 async def bot_added_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
@@ -406,7 +406,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.exception("DB error: %s", exc)
         db_user, is_new = None, False
 
-    # 🆕 گزارش کاربر جدید
     if is_new:
         try:
             await log_report(
@@ -517,10 +516,9 @@ async def check_membership_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 # ═════════════════════════════════════════════
-# گزارش آمار کلی
+# گزارش آمار
 # ═════════════════════════════════════════════
 async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """دستور گزارش — فقط سازنده‌ها."""
     if update.message is None or update.effective_user is None:
         return
 
@@ -914,9 +912,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ═════════════════════════════════════════════
-# اجرای جنگ
+# 🎬 اجرای جنگ داستانی و طولانی
 # ═════════════════════════════════════════════
 async def execute_war(update, context, war: dict) -> None:
+    """جنگ داستانی و طولانی — هر کارگر ۱ ثانیه."""
     query = update.callback_query
 
     attacker_id = war["attacker_id"]
@@ -938,10 +937,7 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text(
             f"❌ <b>حمله لغو شد!</b>\n\n"
             f"🎯 حریف: <b>{target.first_name or 'کاربر'}</b>\n\n"
-            f"⚠️ این کاربر گوشت و چای نداره!\n"
-            f"🥩 گوشت: <b>{target.meat:,}</b>\n"
-            f"🍵 چای: <b>{target.tea:,}</b>\n\n"
-            f"💡 حمله به کسی که چیزی برای دزدیدن نداره، فایده‌ای نداره.",
+            f"⚠️ این کاربر گوشت و چای نداره!",
             parse_mode=ParseMode.HTML,
             reply_markup=back_keyboard(),
         )
@@ -958,65 +954,171 @@ async def execute_war(update, context, war: dict) -> None:
         await query.edit_message_text("❌ کارگر افغانی نداری!", reply_markup=back_keyboard())
         return
 
-    await query.edit_message_text(
-        f"⚔️ <b>جنگ شروع شد!</b>\n\n"
-        f"👤 <b>{attacker_name}</b> با <b>{worker_count:,}</b> کارگر افغانی حمله کرد!\n"
-        f"🎯 هدف: <b>{target_name}</b>\n\n"
-        f"🛡️ <b>{target_name}</b> با <b>{lord_count:,}</b> لر دفاع می‌کنه!\n\n"
-        f"🎺 شیپور جنگ زده شد...\n"
-        f"⏳ کارگرها دارن حرکت می‌کنن...",
-        parse_mode=ParseMode.HTML,
-    )
-    await asyncio.sleep(3)
-
-    await query.edit_message_text(
-        f"⚔️ <b>جنگ در جریانه!</b>\n\n"
-        f"👤 <b>{attacker_name}</b>: <b>{worker_count:,}</b> کارگر افغانی 🔪\n"
-        f"🎯 <b>{target_name}</b>: <b>{lord_count:,}</b> لر 🛡️\n\n"
-        f"🚶 کارگرهای افغانی دارن به سمت حریف می‌رن...\n"
-        f"🏹 لرها آماده‌ی پرت کردن آجرن...\n\n"
-        f"⏳ در حال نزدیک شدن...",
-        parse_mode=ParseMode.HTML,
-    )
-    await asyncio.sleep(3)
-
-    await query.edit_message_text(
-        f"⚔️ <b>نبرد شروع شد!</b>\n\n"
-        f"💥 کارگرهای افغانی به لرها رسیدن!\n\n"
-        f"🛡️ <b>{lord_count:,} لر</b> دارن آجر پرت می‌کنن!\n"
-        f"🔪 <b>{worker_count:,} کارگر</b> دارن حمله می‌کنن!\n\n"
-        f"⏳ در حال نبرد...",
-        parse_mode=ParseMode.HTML,
-    )
-    await asyncio.sleep(3)
-
+    # ─── محاسبه ───
     available_lords = min(lord_count, brick_count)
-    workers_killed = available_lords * 5
-    remaining_workers = max(0, worker_count - workers_killed)
+    workers_killed_by_lords = available_lords * 5
+    remaining_workers = max(0, worker_count - workers_killed_by_lords)
+    actual_workers_killed = min(worker_count, workers_killed_by_lords)
 
-    if available_lords > 0:
-        attacker_new_workers = attacker.workers - (worker_count - remaining_workers)
-        if attacker_new_workers < 0:
-            attacker_new_workers = 0
-    else:
-        remaining_workers = worker_count
-        attacker_new_workers = attacker.workers
-
+    # ═══════════════════════════════════════
+    # صحنه ۱: شروع داستان
+    # ═══════════════════════════════════════
     await query.edit_message_text(
-        f"⚔️ <b>کشتار!</b>\n\n"
-        f"🛡️ <b>{available_lords:,} لر</b> آجر پرت کردن!\n"
-        f"💀 <b>{worker_count - remaining_workers:,} کارگر افغانی</b> کشته شدن!\n"
-        f"🧱 <b>{available_lords:,} آجر</b> مصرف شد!\n\n"
-        f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>\n\n"
-        f"⏳ در حال محاسبه‌ی نتیجه‌ی نهایی...",
+        f"📜 <b>داستان جنگی بزرگ</b>\n"
+        f"<i>فصل اول: آغاز</i>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🌅 <b>سپیده‌دم...</b>\n\n"
+        f"در دشتی پهناور، سپاه <b>{attacker_name}</b> آماده‌ی نبرد شد.\n"
+        f"<b>{worker_count:,}</b> کارگر افغانی با نیزه و شمشیر، آماده‌ی حمله به قلمرو <b>{target_name}</b> شدن.\n\n"
+        f"از آن سو، <b>{target_name}</b> با <b>{lord_count:,}</b> لر و <b>{brick_count:,}</b> آجر آماده‌ی دفاعه.\n\n"
+        f"⏳ <i>کارگرها در حال حرکت به سمت قلمرو دشمن...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(4)
+
+    # ═══════════════════════════════════════
+    # صحنه ۲: راهپیمایی
+    # ═══════════════════════════════════════
+    await query.edit_message_text(
+        f"📜 <b>داستان جنگی بزرگ</b>\n"
+        f"<i>فصل دوم: راهپیمایی</i>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🚶 <b>سپاه در حرکته...</b>\n\n"
+        f"کارگرهای افغانی با پای پیاده، از کوه و دشت گذشتن.\n"
+        f"گرد و غبار آسمان رو تاریک کرده.\n\n"
+        f"🎯 <b>هدف:</b> قلمرو {target_name}\n"
+        f"📍 <b>فاصله:</b> ۱۰ کیلومتر\n\n"
+        f"⏳ <i>اولین گروه پیشقراولان دارن نزدیک می‌شن...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(4)
+
+    # ═══════════════════════════════════════
+    # صحنه ۳: دیده‌بانی
+    # ═══════════════════════════════════════
+    await query.edit_message_text(
+        f"📜 <b>داستان جنگی بزرگ</b>\n"
+        f"<i>فصل سوم: دیده‌بانی</i>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👁️ <b>دیده‌بانان {target_name} سپاه رو دیدن!</b>\n\n"
+        f"🛡️ <b>{lord_count:,} لر</b> با عجله به سنگرها رفتن.\n"
+        f"🧱 <b>{brick_count:,} آجر</b> برای پرتاب آماده شد.\n\n"
+        f"📯 <i>شیپور جنگ زده شد!</i>\n"
+        f"🏰 قلعه‌ی {target_name} در حالت آماده‌باش قرار گرفت.\n\n"
+        f"⏳ <i>لحظه‌ی رویارویی نزدیکه...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(4)
+
+    # ═══════════════════════════════════════
+    # صحنه ۴: شروع نبرد
+    # ═══════════════════════════════════════
+    await query.edit_message_text(
+        f"📜 <b>داستان جنگی بزرگ</b>\n"
+        f"<i>فصل چهارم: نبرد آغاز شد!</i>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"⚔️ <b>اولین برخورد!</b>\n\n"
+        f"💥 کارگرهای افغانی به دیوارهای قلعه رسیدن!\n\n"
+        f"🛡️ لرها شروع کردن به پرت کردن آجر...\n"
+        f"🔪 کارگرها فریاد می‌کشن و حمله می‌کنن...\n\n"
+        f"⏳ <i>نبرد در جریانه...</i>",
         parse_mode=ParseMode.HTML,
     )
     await asyncio.sleep(3)
 
+    # ═══════════════════════════════════════
+    # صحنه ۵: نمایش لحظه‌ای کشتار
+    # ═══════════════════════════════════════
+    # هر کارگر = ۱ ثانیه، ولی حداکثر ۱۰۰ ثانیه (تا طولانی نشه)
+    display_seconds = min(worker_count, 60)
+
+    # هر چند تا کارگر یه بار نمایش بدیم
+    if worker_count <= 20:
+        step = 1
+    elif worker_count <= 50:
+        step = 5
+    elif worker_count <= 100:
+        step = 10
+    else:
+        step = max(1, worker_count // 20)
+
+    killed_so_far = 0
+    battle_events = [
+        "💥 برخورد اول! کارگرها با سپر جلو می‌رن!",
+        "🪨 سنگ از بالا سرازیر می‌شه!",
+        "🏹 تیرها از قلعه پرتاب می‌شن!",
+        "🔥 آتش به سمت کارگرها!",
+        "💪 کارگرها به دروازه رسیدن!",
+        "🩸 زمین از خون رنگین شده!",
+        "🗡️ کارگرها با نیزه حمله می‌کنن!",
+        "🛡️ لرها سنگرها رو مستحکم کردن!",
+        "💀 فریاد کارگرهای زخمی!",
+        "⚔️ نبرد تن‌به‌تن!",
+    ]
+
+    for i in range(0, worker_count + 1, step):
+        killed_so_far = i
+        remaining_now = max(0, worker_count - i)
+
+        # یه رویداد تصادفی
+        event = random.choice(battle_events)
+
+        progress = int((i / max(1, worker_count)) * 10)
+        progress_bar = "█" * progress + "░" * (10 - progress)
+
+        await query.edit_message_text(
+            f"📜 <b>داستان جنگی بزرگ</b>\n"
+            f"<i>فصل پنجم: کشتار</i>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚔️ <b>نبرد در جریانه!</b>\n\n"
+            f"{event}\n\n"
+            f"📊 <b>آمار زنده:</b>\n"
+            f"🔪 کارگرهای زنده: <b>{remaining_now:,}</b>\n"
+            f"💀 کشته‌شده: <b>{killed_so_far:,}</b>\n"
+            f"🛡️ لرهای باقی‌مونده: <b>{max(0, available_lords - (killed_so_far // 5)):,}</b>\n\n"
+            f"[{progress_bar}] {progress*10}%\n\n"
+            f"⏳ <i>نبرد ادامه داره...</i>",
+            parse_mode=ParseMode.HTML,
+        )
+
+        # سرعت: اگه کارگرها زیادن، سریع‌تر
+        if worker_count <= 10:
+            await asyncio.sleep(1)
+        elif worker_count <= 50:
+            await asyncio.sleep(1)
+        elif worker_count <= 100:
+            await asyncio.sleep(0.8)
+        else:
+            await asyncio.sleep(0.6)
+
+    # ═══════════════════════════════════════
+    # صحنه ۶: پایان کشتار
+    # ═══════════════════════════════════════
+    await query.edit_message_text(
+        f"📜 <b>داستان جنگی بزرگ</b>\n"
+        f"<i>فصل ششم: پایان کشتار</i>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🩸 <b>میدون جنگ...</b>\n\n"
+        f"💀 <b>{actual_workers_killed:,} کارگر افغانی</b> کشته شدن.\n"
+        f"🛡️ <b>{available_lords:,} لر</b> در دفاع از قلمروشون قربانی شدن.\n"
+        f"🧱 <b>{available_lords:,} آجر</b> در نبرد مصرف شد.\n\n"
+        f"🔪 <b>کارگرهای باقی‌مونده:</b> {remaining_workers:,}\n\n"
+        f"⏳ <i>در حال محاسبه‌ی نتیجه‌ی نهایی...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(4)
+
+    # ═══════════════════════════════════════
+    # محاسبه دزدی
+    # ═══════════════════════════════════════
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
     stolen_tea = min(stolen_tea, target.tea)
     stolen_meat = min(stolen_meat, target.meat)
+
+    attacker_new_workers = attacker.workers - actual_workers_killed
+    if attacker_new_workers < 0:
+        attacker_new_workers = 0
 
     await update_resources(
         attacker_id,
@@ -1033,27 +1135,40 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
+    # ═══════════════════════════════════════
+    # صحنه ۷: نتیجه نهایی
+    # ═══════════════════════════════════════
     if remaining_workers > 0:
         result = (
-            f"🎉 <b>جنگ تموم شد!</b>\n"
-            f"🏆 <b>{attacker_name}</b> برنده شد!\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📜 <b>داستان جنگی بزرگ</b>\n"
+            f"<i>فصل پایانی: پیروزی!</i>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🏆 <b>{attacker_name} پیروز شد!</b>\n\n"
+            f"🎺 شیپور پیروزی نواخته شد.\n"
+            f"کارگرهای باقی‌مونده وارد قلمرو {target_name} شدن و غنائم رو جمع کردن.\n\n"
+            f"📊 <b>آمار نبرد:</b>\n"
             f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
             f"🎯 هدف: <b>{target_name}</b>\n\n"
             f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
-            f"💀 کارگرهای کشته‌شده: <b>{worker_count - remaining_workers:,}</b>\n"
+            f"💀 کارگرهای کشته‌شده: <b>{actual_workers_killed:,}</b>\n"
             f"🔪 کارگرهای باقی‌مونده: <b>{remaining_workers:,}</b>\n\n"
-            f"🛡️ لرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
-            f"🧱 آجرهای مصرف‌شده‌ی هدف: <b>{available_lords:,}</b>\n\n"
-            f"🎁 <b>غنیمت:</b>\n"
+            f"🛡️ لرهای قربانی‌شده‌ی هدف: <b>{available_lords:,}</b>\n"
+            f"🧱 آجرهای مصرف‌شده: <b>{available_lords:,}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎁 <b>غنائم جنگی:</b>\n"
             f"🥩 گوشت: <b>+{stolen_meat:,}</b>\n"
             f"🍵 چای: <b>+{stolen_tea:,}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
     else:
         result = (
+            f"📜 <b>داستان جنگی بزرگ</b>\n"
+            f"<i>فصل پایانی: شکست!</i>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"💥 <b>حمله شکست خورد!</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🩸 همه‌ی کارگرهای افغانی قربانی شدن.\n"
+            f"قلمرو <b>{target_name}</b> از حمله دفاع کرد.\n\n"
+            f"📊 <b>آمار نبرد:</b>\n"
             f"👤 حمله‌کننده: <b>{attacker_name}</b>\n"
             f"🎯 هدف: <b>{target_name}</b>\n\n"
             f"🔪 کارگرهای فرستاده‌شده: <b>{worker_count:,}</b>\n"
@@ -1066,7 +1181,7 @@ async def execute_war(update, context, war: dict) -> None:
 
     await query.edit_message_text(result, parse_mode=ParseMode.HTML)
 
-    # 🆕 گزارش حمله
+    # گزارش حمله به سازنده‌ها
     try:
         await log_report(
             event_type="attack",
@@ -1080,7 +1195,7 @@ async def execute_war(update, context, war: dict) -> None:
             f"👤 حمله‌کننده: <b>{attacker_name}</b> (<code>{attacker_id}</code>)\n"
             f"🎯 هدف: <b>{target_name}</b> (<code>{target_id}</code>)\n"
             f"🔪 کارگرها: <b>{worker_count:,}</b>\n"
-            f"💀 کشته‌شده: <b>{worker_count - remaining_workers:,}</b>\n"
+            f"💀 کشته‌شده: <b>{actual_workers_killed:,}</b>\n"
             f"🎁 غنیمت: <b>+{stolen_meat:,} گوشت</b>، <b>+{stolen_tea:,} چای</b>",
         )
     except Exception as exc:
@@ -1102,20 +1217,51 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """نمایش پروفایل — خودت یا دیگران."""
     if update.message is None or update.effective_user is None:
         return
 
     user = update.effective_user
-    try:
-        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
-        await check_daily_food(user.id, update)
-    except Exception as exc:
-        logger.exception("DB error: %s", exc)
-        return
+    text = update.message.text.strip()
 
-    remaining = seconds_remaining(db_user)
-    text = format_user_profile(db_user, remaining)
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    # ─── پیدا کردن کاربر هدف ───
+    target_user_db = None
+
+    # ۱. ریپلای روی پیام کاربر
+    if update.message.reply_to_message is not None:
+        replied = update.message.reply_to_message
+        if replied.from_user is not None and not replied.from_user.is_bot:
+            target_user_db = await get_user_by_id(replied.from_user.id)
+        if target_user_db is None and replied.text:
+            replied_text = replied.text.strip()
+            if replied_text.lstrip("-").isdigit():
+                target_user_db, _ = await get_or_create_user_by_id(int(replied_text))
+
+    # ۲. @username توی متن
+    if target_user_db is None:
+        parts = text.split()
+        if len(parts) > 1:
+            target_str = parts[1]
+            if target_str.startswith("@"):
+                target_user_db = await get_user_by_username(target_str)
+            elif target_str.lstrip("-").isdigit() and len(target_str.lstrip("-")) >= 6:
+                try:
+                    target_user_db, _ = await get_or_create_user_by_id(int(target_str))
+                except Exception:
+                    pass
+
+    # ۳. اگه کاربر پیدا نشد → پروفایل خودت
+    if target_user_db is None:
+        try:
+            target_user_db, _ = await get_or_create_user(user.id, user.username, user.first_name)
+            await check_daily_food(user.id, update)
+        except Exception as exc:
+            logger.exception("DB error: %s", exc)
+            return
+
+    remaining = seconds_remaining(target_user_db)
+    text_profile = format_user_profile(target_user_db, remaining)
+    await update.message.reply_text(text_profile, parse_mode=ParseMode.HTML)
 
 
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1459,7 +1605,6 @@ async def admin_transfer_handler(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as exc:
         logger.exception("send_message error: %s", exc)
 
-    # 🆕 گزارش انتقال مدیر
     try:
         await log_report(
             event_type="admin_transfer",
@@ -1586,7 +1731,6 @@ async def admin_remove_transfer_handler(update: Update, context: ContextTypes.DE
     except Exception as exc:
         logger.exception("send_message error: %s", exc)
 
-    # 🆕 گزارش پس گرفتن
     try:
         await log_report(
             event_type="admin_remove_transfer",
@@ -1653,11 +1797,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await process_buy_amount(update, context, int(text))
         return
 
+    # پروفایل با ریپلای
+    if text == CMD_PROFILE or text.startswith("پروفایل "):
+        await profile_handler(update, context)
+        return
     if text == CMD_HELP:
         await help_handler(update, context)
-        return
-    if text == CMD_PROFILE:
-        await profile_handler(update, context)
         return
     if text in (CMD_TOP, "برتر"):
         await top_handler(update, context)
