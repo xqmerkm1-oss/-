@@ -90,6 +90,7 @@ CMD_PROFILE = "پروفایل"
 CMD_TOP = "برترها"
 CMD_RESOURCES = "منابع"
 CMD_REPORT = "گزارش"
+CMD_SHOP = "فروشگاه"
 
 
 # ═════════════════════════════════════════════
@@ -227,7 +228,6 @@ async def auto_close_help_panel(
     owner_id: int,
     delay: int = HELP_TIMEOUT_SECONDS,
 ) -> None:
-    """بعد از delay ثانیه، پنل راهنما رو پاک می‌کنه."""
     try:
         await asyncio.sleep(delay)
     except asyncio.CancelledError:
@@ -326,6 +326,43 @@ async def bot_left_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"📛 نام گروه: <b>{chat.title or 'بدون نام'}</b>\n"
         f"🆔 آی‌دی گروه: <code>{chat.id}</code>\n"
         f"👤 حذف‌کننده: <b>{removed_by_name}</b>",
+    )
+
+
+# ═════════════════════════════════════════════
+# نمایش فروشگاه
+# ═════════════════════════════════════════════
+async def shop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """نمایش فروشگاه توی گروه."""
+    if update.message is None or update.effective_user is None:
+        return
+
+    user = update.effective_user
+
+    try:
+        db_user, _ = await get_or_create_user(user.id, user.username, user.first_name)
+        await check_daily_food(user.id, update)
+    except Exception as exc:
+        logger.exception("DB error: %s", exc)
+        return
+
+    await update.message.reply_text(
+        f"🛒 <b>فروشگاه شومپد</b>\n\n"
+        f"💰 <b>موجودی تو:</b>\n"
+        f"🥖 نون بربری: <b>{db_user.bread_count:,}</b>\n"
+        f"🧱 آجر: <b>{db_user.bricks:,}</b>\n"
+        f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n"
+        f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
+        f"🛡️ لر: <b>{db_user.lords:,}</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏪 <b>لیست فروش:</b>\n\n"
+        f"🔪 <b>کارگر افغانی</b> — ۱۰۰ نون بربری\n"
+        f"🛡️ <b>لر</b> — ۵۰ آجر\n"
+        f"🍰 <b>کیک یزدی</b> — ۱۰ نون بربری\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"💡 روی دکمه‌ی مورد نظر بزن:",
+        parse_mode=ParseMode.HTML,
+        reply_markup=shop_keyboard(owner_id=user.id),
     )
 
 
@@ -624,7 +661,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── بستن (عمومی) ───
+    # ─── بستن عمومی ───
     if data == "menu_close":
         try:
             await query.message.delete()
@@ -632,7 +669,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.exception("Delete error: %s", exc)
         return
 
-    # ─── راهنما: توضیحات کوتاه (قفل‌شده) ───
+    # ─── راهنما: توضیحات کوتاه ───
     if data.startswith("help_short_"):
         try:
             owner_id = int(data.replace("help_short_", ""))
@@ -657,7 +694,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── راهنما: توضیحات کامل (قفل‌شده) ───
+    # ─── راهنما: توضیحات کامل ───
     if data.startswith("help_full_"):
         try:
             owner_id = int(data.replace("help_full_", ""))
@@ -682,7 +719,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # ─── راهنما: بازگشت (قفل‌شده) ───
+    # ─── راهنما: بازگشت ───
     if data.startswith("help_back_"):
         try:
             owner_id = int(data.replace("help_back_", ""))
@@ -722,7 +759,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
             return
 
-        # کنسل تایمر بستن خودکار
         task = context.user_data.pop("help_timeout_task", None)
         if task is not None:
             try:
@@ -766,20 +802,40 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         await query.edit_message_text(
             f"🛒 <b>فروشگاه شومپد</b>\n\n"
-            f"💰 موجودی تو:\n"
+            f"💰 <b>موجودی تو:</b>\n"
             f"🥖 نون بربری: <b>{db_user.bread_count:,}</b>\n"
             f"🧱 آجر: <b>{db_user.bricks:,}</b>\n"
-            f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n\n"
-            f"🔪 کارگر افغانی — ۱۰۰ نون بربری\n"
-            f"🛡️ لر — ۵۰ آجر\n"
-            f"🍰 کیک یزدی — ۱۰ نون بربری",
+            f"🍰 کیک یزدی: <b>{db_user.cake:,}</b>\n"
+            f"🔪 کارگر افغانی: <b>{db_user.workers:,}</b>\n"
+            f"🛡️ لر: <b>{db_user.lords:,}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏪 <b>لیست فروش:</b>\n\n"
+            f"🔪 <b>کارگر افغانی</b> — ۱۰۰ نون بربری\n"
+            f"🛡️ <b>لر</b> — ۵۰ آجر\n"
+            f"🍰 <b>کیک یزدی</b> — ۱۰ نون بربری\n"
+            f"━━━━━━━━━━━━━━━━━━━━",
             parse_mode=ParseMode.HTML,
-            reply_markup=shop_keyboard(),
+            reply_markup=shop_keyboard(owner_id=user.id),
         )
         return
 
-    # ─── شروع خرید ───
-    if data == "shop_buy_worker":
+    # ─── خرید کارگر افغانی ───
+    if data.startswith("shop_buy_worker_"):
+        try:
+            owner_id = int(data.replace("shop_buy_worker_", ""))
+        except ValueError:
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if user.id != owner_id:
+            await query.answer(
+                "⛔ تو دسترسی نداری!\n\n"
+                "این پنل مال یه کاربر دیگه‌ست.\n"
+                "خودت یه فروشگاه بساز: فروشگاه",
+                show_alert=True,
+            )
+            return
+
         context.user_data["buying"] = {
             "item": "worker",
             "price_per": 100,
@@ -796,7 +852,23 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    if data == "shop_buy_lord":
+    # ─── خرید لر ───
+    if data.startswith("shop_buy_lord_"):
+        try:
+            owner_id = int(data.replace("shop_buy_lord_", ""))
+        except ValueError:
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if user.id != owner_id:
+            await query.answer(
+                "⛔ تو دسترسی نداری!\n\n"
+                "این پنل مال یه کاربر دیگه‌ست.\n"
+                "خودت یه فروشگاه بساز: فروشگاه",
+                show_alert=True,
+            )
+            return
+
         context.user_data["buying"] = {
             "item": "lord",
             "price_per": 50,
@@ -813,7 +885,23 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    if data == "shop_buy_cake":
+    # ─── خرید کیک یزدی ───
+    if data.startswith("shop_buy_cake_"):
+        try:
+            owner_id = int(data.replace("shop_buy_cake_", ""))
+        except ValueError:
+            await query.answer("❌ خطا", show_alert=True)
+            return
+
+        if user.id != owner_id:
+            await query.answer(
+                "⛔ تو دسترسی نداری!\n\n"
+                "این پنل مال یه کاربر دیگه‌ست.\n"
+                "خودت یه فروشگاه بساز: فروشگاه",
+                show_alert=True,
+            )
+            return
+
         context.user_data["buying"] = {
             "item": "cake",
             "price_per": 10,
@@ -898,6 +986,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_keyboard())
         return
 
+    # ─── لغو خرید ───
     if data == "cancel_buy":
         context.user_data.pop("buying", None)
         await query.edit_message_text("❌ خرید لغو شد.", reply_markup=back_keyboard())
@@ -1030,7 +1119,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ═════════════════════════════════════════════
-# اجرای جنگ داستانی و طولانی
+# اجرای جنگ داستانی
 # ═════════════════════════════════════════════
 async def execute_war(update, context, war: dict) -> None:
     query = update.callback_query
@@ -1076,7 +1165,7 @@ async def execute_war(update, context, war: dict) -> None:
     remaining_workers = max(0, worker_count - workers_killed_by_lords)
     actual_workers_killed = min(worker_count, workers_killed_by_lords)
 
-    # ─── صحنه ۱ ───
+    # صحنه ۱
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل اول: آغاز</i>\n\n"
@@ -1090,7 +1179,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(4)
 
-    # ─── صحنه ۲ ───
+    # صحنه ۲
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل دوم: راهپیمایی</i>\n\n"
@@ -1105,7 +1194,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(4)
 
-    # ─── صحنه ۳ ───
+    # صحنه ۳
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل سوم: دیده‌بانی</i>\n\n"
@@ -1120,7 +1209,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(4)
 
-    # ─── صحنه ۴ ───
+    # صحنه ۴
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل چهارم: نبرد آغاز شد!</i>\n\n"
@@ -1134,7 +1223,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(3)
 
-    # ─── صحنه ۵: کشتار (نمایش لحظه‌ای) ───
+    # صحنه ۵: کشتار
     if worker_count <= 20:
         step = 1
     elif worker_count <= 50:
@@ -1161,9 +1250,7 @@ async def execute_war(update, context, war: dict) -> None:
     for i in range(0, worker_count + 1, step):
         killed_so_far = i
         remaining_now = max(0, worker_count - i)
-
         event = random.choice(battle_events)
-
         progress = int((i / max(1, worker_count)) * 10)
         progress_bar = "█" * progress + "░" * (10 - progress)
 
@@ -1182,16 +1269,14 @@ async def execute_war(update, context, war: dict) -> None:
             parse_mode=ParseMode.HTML,
         )
 
-        if worker_count <= 10:
-            await asyncio.sleep(1)
-        elif worker_count <= 50:
+        if worker_count <= 50:
             await asyncio.sleep(1)
         elif worker_count <= 100:
             await asyncio.sleep(0.8)
         else:
             await asyncio.sleep(0.6)
 
-    # ─── صحنه ۶ ───
+    # صحنه ۶
     await query.edit_message_text(
         f"📜 <b>داستان جنگی بزرگ</b>\n"
         f"<i>فصل ششم: پایان کشتار</i>\n\n"
@@ -1206,7 +1291,7 @@ async def execute_war(update, context, war: dict) -> None:
     )
     await asyncio.sleep(4)
 
-    # ─── محاسبه دزدی ───
+    # محاسبه دزدی
     stolen_tea = remaining_workers * 3
     stolen_meat = remaining_workers * 1
     stolen_tea = min(stolen_tea, target.tea)
@@ -1231,7 +1316,7 @@ async def execute_war(update, context, war: dict) -> None:
         meat=target.meat - stolen_meat,
     )
 
-    # ─── صحنه ۷: نتیجه ───
+    # صحنه ۷: نتیجه
     if remaining_workers > 0:
         result = (
             f"📜 <b>داستان جنگی بزرگ</b>\n"
@@ -1275,7 +1360,6 @@ async def execute_war(update, context, war: dict) -> None:
 
     await query.edit_message_text(result, parse_mode=ParseMode.HTML)
 
-    # گزارش حمله
     try:
         await log_report(
             event_type="attack",
@@ -1300,14 +1384,12 @@ async def execute_war(update, context, war: dict) -> None:
 # راهنما، پروفایل، برترها، منابع
 # ═════════════════════════════════════════════
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """نمایش راهنما — پنل قفل‌شده برای هر کاربر."""
     if update.message is None or update.effective_user is None:
         return
 
     user = update.effective_user
     owner_id = user.id
 
-    # پاک کردن پنل قبلی اگه بود
     old_panel = context.user_data.get("help_panel_msg_id")
     if old_panel is not None:
         try:
@@ -1318,7 +1400,6 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except Exception:
             pass
 
-    # ارسال پنل جدید
     sent = await update.message.reply_text(
         HELP_MENU_TEXT,
         parse_mode=ParseMode.HTML,
@@ -1326,18 +1407,15 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         disable_web_page_preview=True,
     )
 
-    # ذخیره اطلاعات پنل
     context.user_data["help_panel_msg_id"] = sent.message_id
     context.user_data["help_panel_chat_id"] = sent.chat.id
 
-    # کنسل تایمر قبلی اگه بود
     if "help_timeout_task" in context.user_data:
         try:
             context.user_data["help_timeout_task"].cancel()
         except Exception:
             pass
 
-    # بستن خودکار بعد از ۵ دقیقه
     task = asyncio.create_task(
         auto_close_help_panel(
             context=context,
@@ -1931,9 +2009,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await help_handler(update, context)
         return
 
-    # پروفایل (با یا بدون ریپلای)
+    # پروفایل
     if text == CMD_PROFILE or text.startswith("پروفایل "):
         await profile_handler(update, context)
+        return
+
+    # فروشگاه (🆕)
+    if text in ("فروشگاه", "فروشگاه شومپد", "شومپد فروشگاه"):
+        await shop_handler(update, context)
         return
 
     if text in (CMD_TOP, "برتر"):
