@@ -44,24 +44,26 @@ def back_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def help_keyboard() -> InlineKeyboardMarkup:
+def help_keyboard(owner_id: int) -> InlineKeyboardMarkup:
+    """دکمه‌های راهنمای اصلی — با owner_id برای قفل."""
     keyboard = [
         [
-            _btn("📘 توضیحات کوتاه", callback_data="help_short", style="primary"),
-            _btn("📚 توضیحات کامل", callback_data="help_full", style="success"),
+            _btn("📘 توضیحات کوتاه", callback_data=f"help_short_{owner_id}", style="primary"),
+            _btn("📚 توضیحات کامل", callback_data=f"help_full_{owner_id}", style="success"),
         ],
         [
-            _btn("🔙 بستن", callback_data="menu_close", style="danger"),
+            _btn("🔙 بستن", callback_data=f"menu_close_{owner_id}", style="danger"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def help_back_keyboard() -> InlineKeyboardMarkup:
+def help_back_keyboard(owner_id: int) -> InlineKeyboardMarkup:
+    """دکمه بازگشت به راهنمای اصلی — با owner_id."""
     keyboard = [
         [
-            _btn("🔙 بازگشت به راهنما", callback_data="help_back", style="primary"),
-            _btn("❌ بستن", callback_data="menu_close", style="danger"),
+            _btn("🔙 بازگشت به راهنما", callback_data=f"help_back_{owner_id}", style="primary"),
+            _btn("❌ بستن", callback_data=f"menu_close_{owner_id}", style="danger"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
