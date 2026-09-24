@@ -38,7 +38,7 @@ def build_application() -> Application:
         .build()
     )
 
-    # عضویت اجباری
+    # ─── عضویت اجباری ───
     app.add_handler(
         CallbackQueryHandler(
             check_membership_callback,
@@ -46,15 +46,23 @@ def build_application() -> Application:
         )
     )
 
-    # همه دکمه‌ها
+    # ─── همه دکمه‌های دیگه ───
+    # menu_ → منوی اصلی
+    # shop_ → فروشگاه
+    # help_ → راهنما
+    # confirm_buy / cancel_buy → تایید خرید
+    # war_ → جنگ (ثبت درخواست، تایید، لغو)
     app.add_handler(
         CallbackQueryHandler(
             menu_callback,
-            pattern=r"^(menu_|shop_|help_|confirm_buy$|cancel_buy$)",
+            pattern=r"^(menu_|shop_|help_|confirm_buy$|cancel_buy$|war_)",
         )
     )
 
+    # ─── /start ───
     app.add_handler(CommandHandler("start", start_handler))
+
+    # ─── همه پیام‌های متنی ───
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)
     )
