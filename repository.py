@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 
 from database import AsyncSessionLocal
-from models import User
+from models import Group, Report, User
 
 COOLDOWN_SECONDS = 180
 
@@ -39,6 +39,9 @@ RESOURCE_MAP = {
 }
 
 
+# ─────────────────────────────────────────────
+# کاربر
+# ─────────────────────────────────────────────
 async def get_or_create_user(
     telegram_id: int,
     username: str | None = None,
@@ -316,35 +319,6 @@ async def transfer_shields(from_id: int, to_id: int, amount: int) -> bool:
         return True
 
 
-async def transfer_resource(
-    from_id: int, to_id: int, resource_name: str, amount: int
-) -> tuple[bool, int, int]:
-    column = RESOURCE_MAP.get(resource_name)
-    if column is None:
-        return False, 0, 0
-
-    async with AsyncSessionLocal() as session:
-        r1 = await session.execute(select(User).where(User.telegram_id == from_id))
-        sender = r1.scalar_one_or_none()
-        if sender is None:
-            return False, 0, 0
-
-        r2 = await session.execute(select(User).where(User.telegram_id == to_id))
-        receiver = r2.scalar_one_or_none()
-        if receiver is None:
-            return False, 0, 0
-
-        sender_val = getattr(sender, column)
-        receiver_val = getattr(receiver, column)
-
-        setattr(sender, column, sender_val - amount)
-        setattr(receiver, column, receiver_val + amount)
-
-        await session.commit()
-
-        return True, sender_val - amount, receiver_val + amount
-
-
 def seconds_remaining(user: User) -> int:
     if user.last_reward_at is None:
         return 0
@@ -365,3 +339,152 @@ async def get_top_users(limit: int = 10) -> list[User]:
             select(User).order_by(desc(User.pads)).limit(limit)
         )
         return list(result.scalars().all())
+
+
+# ─────────────────────────────────────────────
+# گروه‌ها
+# ─────────────────────────────────────────────
+async def add_or_update_group(
+    group_id: int,
+    title: str,
+    added_by: int | None = None,
+    added_by_name: str | None = None,
+    member_count: int = 0,
+) -> Group:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Group).where(Group.group_id == group_id)
+        )
+        group = result.scalar_one_or_none()
+
+        if group is None:
+            group = Group(
+                group_id=group_id,
+                title=title,
+                added_by=added_by,
+                added_by_name=added_by_name,
+                member_count=member_count,
+                is_active=True,
+            )
+            session.add(group)
+        else:
+            group.title = title
+            group.member_count = member_count
+            group.is_active = True
+            group.removed_at = None
+
+        await session.commit()
+        await session.refresh(group)
+        return group
+
+
+async def mark_group_removed(group_id: int) -> None:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Group).where(Group.group_id == group_id)
+        )
+        group = result.scalar_one_or_none()
+        if group is not None:
+            group.is_active = False
+            group.removed_at = datetime.now(timezone.utc)
+            await session.commit()
+
+
+async def get_all_groups() -> list[Group]:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Group).order_by(desc(Group.added_at))
+        )
+        return list(result.scalars().all())
+
+
+async def get_active_groups_count() -> int:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(func.count(Group.id)).where(Group.is_active == True)
+        )
+        return result.scalar() or 0
+
+
+# ─────────────────────────────────────────────
+# گزارش‌ها
+# ─────────────────────────────────────────────
+async def log_report(
+    event_type: str,
+    description: str | None = None,
+    user_id: int | None = None,
+    target_id: int | None = None,
+    group_id: int | None = None,
+) -> Report:
+    async with AsyncSessionLocal() as session:
+        report = Report(
+            event_type=event_type,
+            description=description,
+            user_id=user_id,
+            target_id=target_id,
+            group_id=group_id,
+        )
+        session.add(report)
+        await session.commit()
+        await session.refresh(report)
+        return report
+
+
+async def get_stats() -> dict:
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(hours=24)
+    last_week = now - timedelta(days=7)
+
+    async with AsyncSessionLocal() as session:
+        total_users = (await session.execute(select(func.count(User.id)))).scalar() or 0
+        users_24h = (
+            await session.execute(
+                select(func.count(User.id)).where(User.created_at >= yesterday)
+            )
+        ).scalar() or 0
+        users_7d = (
+            await session.execute(
+                select(func.count(User.id)).where(User.created_at >= last_week)
+            )
+        ).scalar() or 0
+
+        total_groups = (await session.execute(select(func.count(Group.id)))).scalar() or 0
+        active_groups = (
+            await session.execute(
+                select(func.count(Group.id)).where(Group.is_active == True)
+            )
+        ).scalar() or 0
+
+        total_attacks = (
+            await session.execute(
+                select(func.count(Report.id)).where(Report.event_type == "attack")
+            )
+        ).scalar() or 0
+        attacks_24h = (
+            await session.execute(
+                select(func.count(Report.id)).where(
+                    Report.event_type == "attack",
+                    Report.created_at >= yesterday,
+                )
+            )
+        ).scalar() or 0
+
+        total_invites = (await session.execute(select(func.sum(User.invite_count)))).scalar() or 0
+
+        total_pads = (await session.execute(select(func.sum(User.pads)))).scalar() or 0
+        total_workers = (await session.execute(select(func.sum(User.workers)))).scalar() or 0
+        total_lords = (await session.execute(select(func.sum(User.lords)))).scalar() or 0
+
+        return {
+            "total_users": total_users,
+            "users_24h": users_24h,
+            "users_7d": users_7d,
+            "total_groups": total_groups,
+            "active_groups": active_groups,
+            "total_attacks": total_attacks,
+            "attacks_24h": attacks_24h,
+            "total_invites": total_invites,
+            "total_pads": total_pads,
+            "total_workers": total_workers,
+            "total_lords": total_lords,
+        }
